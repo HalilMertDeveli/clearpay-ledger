@@ -1,0 +1,58 @@
+@page
+@model ClearPay.Web.Pages.Account.RegisterModel
+@{
+    Layout = "_AuthLayout";
+    ViewData["Title"] = L["Register"].Value;
+    ViewData["MetaDescription"] = L["MetaRegister"].Value;
+}
+
+<h1 class="page-title">@L["CreateAccount"]</h1>
+<p class="lede">@L["RegisterLede"]</p>
+<form method="post" class="auth-form" novalidate>
+    <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+    <div class="field">
+        <label asp-for="Input.FullName" class="field-label">@L["FullName"]</label>
+        <input asp-for="Input.FullName" class="field-input" autocomplete="name" />
+        <span asp-validation-for="Input.FullName" class="field-error"></span>
+    </div>
+    <div class="field">
+        <label asp-for="Input.Email" class="field-label">@L["Email"]</label>
+        <input asp-for="Input.Email" class="field-input" type="email" autocomplete="username" />
+        <span asp-validation-for="Input.Email" class="field-error"></span>
+    </div>
+    <div class="field">
+        <label asp-for="Input.Phone" class="field-label">@L["Phone"]</label>
+        <input asp-for="Input.Phone" class="field-input" type="tel" inputmode="numeric" autocomplete="tel" />
+        <span asp-validation-for="Input.Phone" class="field-error"></span>
+        <p class="field-hint">@L["PhoneHint"]</p>
+    </div>
+    <fieldset class="field">
+        <legend class="field-label">@L["AccountKind"]</legend>
+        <p class="field-hint">@L["AccountKindHint"]</p>
+        <div class="choice-row">
+            <label class="check-label">
+                <input asp-for="Input.AccountKind" type="radio" value="Bireysel" />
+                <span>@L["AccountKindIndividual"]</span>
+            </label>
+            <label class="check-label">
+                <input asp-for="Input.AccountKind" type="radio" value="Kurumsal" />
+                <span>@L["AccountKindCorporate"]</span>
+            </label>
+        </div>
+        <span asp-validation-for="Input.AccountKind" class="field-error"></span>
+    </fieldset>
+    <div class="field">
+        <label asp-for="Input.Password" class="field-label">@L["Password"]</label>
+        <input asp-for="Input.Password" class="field-input" type="password" autocomplete="new-password" />
+        <span asp-validation-for="Input.Password" class="field-error"></span>
+        <p class="field-hint">@L["PasswordHint"]</p>
+    </div>
+    <div class="field">
+        <label asp-for="Input.ConfirmPassword" class="field-label">@L["ConfirmPassword"]</label>
+        <input asp-for="Input.ConfirmPassword" class="field-input" type="password" autocomplete="new-password" />
+        <span asp-validation-for="Input.ConfirmPassword" class="field-error"></span>
+    </div>
+    <button type="submit" class="btn btn-block">@L["CreateAccount"]</button>
+</form>
+<partial name="_ExternalLoginButtons" model="(string?)null" />
+<p class="auth-switch">@L["HaveAccount"] <a asp-page="/Account/Login">@L["SignIn"]</a></p>

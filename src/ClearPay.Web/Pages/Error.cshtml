@@ -1,0 +1,16 @@
+﻿@page
+@model ErrorModel
+@{
+    ViewData["Title"] = L["Error"].Value;
+}
+
+<h1 class="page-title">@L["ErrorLede"]</h1>
+<section class="panel">
+    @if (Model.ShowRequestId)
+    {
+        <p class="empty">@L["RequestId"]: <code>@Model.RequestId</code></p>
+    }
+    <div class="actions">
+        <a class="btn" asp-page="/Index">@L["BackToWallet"]</a>
+    </div>
+</section>

@@ -1,0 +1,70 @@
+@using ClearPay.Web.Localization
+@{
+    var meta = ViewData["MetaDescription"] as string ?? L["MetaSignIn"].Value;
+    var title = ViewData["Title"] as string ?? L["SignIn"].Value;
+}
+<!DOCTYPE html>
+<html lang="@AppCultures.HtmlLang">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@title — ClearPay (Demo)</title>
+    <meta name="theme-color" content="#1B2A4A" />
+    <meta name="description" content="@meta" />
+    <meta property="og:title" content="@title — ClearPay (Demo)" />
+    <meta property="og:description" content="@meta" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="@AppCultures.OgLocale" />
+    <meta name="robots" content="noindex,nofollow" />
+    <link rel="icon" href="~/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/brand.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/motion.css" asp-append-version="true" />
+    <script>
+        if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            document.documentElement.classList.add("auth-motion");
+        }
+    </script>
+</head>
+<body class="auth-body">
+    <a class="skip-link" href="#main">@L["SkipToContent"]</a>
+    <header class="auth-top">
+        <a class="brand" asp-page="/Account/Login">
+            <span class="brand-mark" aria-hidden="true">C</span>
+            <span class="brand-name wordmark">ClearPay</span>
+        </a>
+        <div class="auth-lang">
+            <partial name="_LanguagePicker" />
+        </div>
+    </header>
+    <div class="auth-stage">
+        <aside class="auth-hero" aria-label="@L["DemoWallet"]">
+            <div class="auth-hero-shapes" aria-hidden="true">
+                <span class="auth-orb auth-orb--a"></span>
+                <span class="auth-orb auth-orb--b"></span>
+                <span class="auth-orb auth-orb--c"></span>
+            </div>
+            <div class="auth-hero-copy">
+                <p class="auth-hero-kicker">ClearPay</p>
+                <p class="auth-hero-title">@L["DemoWallet"]</p>
+                <p class="auth-hero-lede">@L["DemoDisclaimer"]</p>
+            </div>
+        </aside>
+        <div class="auth-shell">
+            <main id="main" class="auth-card">
+                <span class="brand-mark auth-mark" aria-hidden="true">C</span>
+                <p class="brand-tagline">@L["DemoWallet"]</p>
+                @RenderBody()
+            </main>
+            <p class="auth-footer">@L["DemoDisclaimer"]</p>
+        </div>
+    </div>
+    <script src="~/js/vendor/anime.min.js" asp-append-version="true"></script>
+    <script src="~/js/auth-hero.js" asp-append-version="true"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

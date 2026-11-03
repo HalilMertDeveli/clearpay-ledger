@@ -1,0 +1,835 @@
+/* ClearPay brand layer — T-040 + T-053 (mobil) + T-055 (demo kart) + T-057 (onay) + T-072 (internet-şube kromu).
+   Load after site.css. Yumuşak gölge serbest; gradient bakiye + .demo-card. YK/Worldcard asset yok. */
+
+:root {
+  --brand-navy: #1b2a4a;
+  --brand-teal: #0f766e;
+  --brand-teal-bright: #14b8a6;
+  --brand-warm: #c2782a;
+  --brand-track: 0.04em;
+  --brand-kicker-track: 0.08em;
+  --brand-accent-line: 3px;
+  --motion: 180ms ease;
+  --danger: #8a1f1f;
+
+  /* T-053 derinlik — parlama yok, düşük opaklık */
+  --elev-1: 0 1px 2px rgba(27, 42, 74, 0.06), 0 2px 8px rgba(27, 42, 74, 0.05);
+  --elev-2: 0 -1px 0 rgba(27, 42, 74, 0.06), 0 -6px 18px rgba(27, 42, 74, 0.07);
+  --elev-3: 0 2px 6px rgba(27, 42, 74, 0.08), 0 12px 28px rgba(27, 42, 74, 0.1);
+  --hero-grad: linear-gradient(160deg, #24365c 0%, #1b2a4a 62%);
+
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+  --tabbar-h: 64px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Kart yükseltmesi — 1px çizgi durur, gölge onu yumuşatır */
+.stat-card,
+.panel,
+.panel-inline,
+.ops-rail {
+  box-shadow: var(--elev-1);
+}
+
+.auth-card,
+.wallet-sheet {
+  box-shadow: var(--elev-3);
+}
+
+.balance-hero {
+  background: var(--hero-grad);
+  box-shadow: var(--elev-3);
+}
+
+.wallet-sheet {
+  border-radius: var(--radius-lg);
+}
+
+.confirm-sheet {
+  margin-top: 0.35rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line, #d8dee8);
+}
+
+.confirm-sheet .panel-title:focus {
+  outline: 2px solid var(--brand-navy);
+  outline-offset: 2px;
+}
+
+form[aria-busy="true"] .remain strong,
+form[aria-busy="true"] .field-input {
+  background: #e8eef5;
+  color: transparent;
+  caret-color: transparent;
+}
+
+.brand-name,
+.wordmark {
+  letter-spacing: var(--brand-track);
+  font-weight: 700;
+}
+
+.brand-mark {
+  letter-spacing: 0;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.pill-admin {
+  border-color: var(--brand-warm);
+  color: #fff;
+}
+
+.page-kicker {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: var(--brand-kicker-track);
+  text-transform: uppercase;
+  margin: 0 0 0.4rem;
+  color: var(--teal, #0f766e);
+}
+
+.page-title {
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.5rem;
+}
+
+.stat-value,
+.stat-value-xl,
+.remain strong,
+.panel-inline strong,
+th.num,
+td.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-value-xl {
+  font-size: 2.85rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.stat-in .stat-value,
+.wallet-sheet .stat-card--in .stat-value {
+  color: var(--teal, #0f766e);
+}
+
+.balance-hero.wallet-band {
+  border-left: 0;
+}
+
+.wallet-band .live-pill {
+  position: absolute;
+  top: 1.15rem;
+  right: 1.2rem;
+  margin: 0;
+}
+
+.wallet-band {
+  padding-right: 6.75rem;
+}
+
+.kicker-on-dark {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.title-on-dark {
+  color: #fff;
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0 0 0.2rem;
+}
+
+.lede-on-dark {
+  color: rgba(255, 255, 255, 0.82);
+  margin: 0 0 0.85rem;
+}
+
+.wallet-sheet .stat-card {
+  background: #f4f7fb;
+  border: 1px solid transparent;
+}
+
+.auth-mark {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 0 0 0.85rem;
+  font-size: 1.05rem;
+}
+
+.auth-card .brand-tagline {
+  letter-spacing: 0.02em;
+  margin: 0 0 1.25rem;
+  font-size: 0.85rem;
+}
+
+.auth-card .lede {
+  margin-bottom: 0;
+}
+
+.auth-form .field {
+  margin-bottom: 1.1rem;
+}
+
+.auth-form .btn-block {
+  margin-top: 0.25rem;
+}
+
+.field-input[inputmode="decimal"] {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.empty-block,
+.empty-cell {
+  text-align: center;
+  padding: 2.25rem 1rem;
+}
+
+.empty-block {
+  background: rgba(15, 118, 110, 0.05);
+  border: 1px dashed rgba(15, 118, 110, 0.28);
+  border-radius: var(--radius, 12px);
+}
+
+.empty-mark {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: 0 auto 0.85rem;
+  border-radius: 0.7rem;
+  background: var(--teal, #0f766e);
+}
+
+.empty-mark::after {
+  content: "";
+  width: 1.2rem;
+  height: 0.72rem;
+  border: 2px solid #fff;
+  border-radius: 3px;
+  box-shadow: 0.35rem 0.15rem 0 -1px #fff;
+}
+
+.empty-title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink, #1b2a4a);
+}
+
+.empty-hint {
+  margin: 0;
+  color: var(--muted, #5c6b86);
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.55rem;
+  margin: 1.1rem 0 0;
+}
+
+th.num,
+td.num {
+  text-align: right;
+}
+
+.mono {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+/* Social login — keep/restyle Coder Identity buttons; do not remove. */
+.auth-social,
+.external-logins,
+.auth-providers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0 0 0.25rem;
+}
+
+.btn-social,
+.btn-external,
+.btn-google,
+.btn-apple,
+button.external-login {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.65rem 1.15rem;
+  border-radius: var(--radius-btn, 8px);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn.btn-google,
+.btn-google,
+button.external-login[value="Google"],
+button[name="provider"][value="Google"] {
+  background: #fff;
+  color: var(--navy, #1b2a4a);
+  border: 1px solid var(--line, #d8dee8);
+}
+
+.btn.btn-google:hover,
+.btn-google:hover,
+button.external-login[value="Google"]:hover,
+button[name="provider"][value="Google"]:hover {
+  border-color: var(--teal, #0f766e);
+  background: rgba(15, 118, 110, 0.06);
+  color: var(--navy, #1b2a4a);
+}
+
+.btn.btn-apple,
+.btn-apple,
+button.external-login[value="Apple"],
+button[name="provider"][value="Apple"] {
+  background: #111;
+  color: #fff;
+  border: 1px solid #111;
+}
+
+.btn.btn-apple:hover,
+.btn-apple:hover,
+button.external-login[value="Apple"]:hover,
+button[name="provider"][value="Apple"]:hover {
+  background: #2a2a2a;
+  border-color: #2a2a2a;
+  color: #fff;
+}
+
+/* CSS glyphs — geometric only; not Alipay QR / trademark icons */
+.action-ico::before,
+.action-ico::after,
+.nav-ico::before,
+.nav-ico::after {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+}
+
+.action-ico--send::before {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-top: 2px solid var(--navy, #1b2a4a);
+  border-right: 2px solid var(--navy, #1b2a4a);
+  transform: translate(-60%, -50%) rotate(45deg);
+}
+
+.action-ico--topup::before {
+  width: 2px;
+  height: 0.9rem;
+  background: var(--navy, #1b2a4a);
+}
+
+.action-ico--topup::after {
+  width: 0.9rem;
+  height: 2px;
+  background: var(--navy, #1b2a4a);
+}
+
+.action-ico--withdraw::before {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-top: 2px solid var(--navy, #1b2a4a);
+  border-right: 2px solid var(--navy, #1b2a4a);
+  transform: translate(-50%, -35%) rotate(-45deg);
+}
+
+.action-ico--activity::before {
+  width: 0.95rem;
+  height: 2px;
+  background: var(--navy, #1b2a4a);
+  box-shadow: 0 5px 0 var(--navy, #1b2a4a), 0 10px 0 var(--navy, #1b2a4a);
+  transform: translate(-50%, calc(-50% - 5px));
+}
+
+.action-ico--cards::before {
+  width: 0.95rem;
+  height: 0.62rem;
+  border: 2px solid var(--navy, #1b2a4a);
+  border-radius: 3px;
+}
+
+.nav-ico--overview::before {
+  width: 0.55rem;
+  height: 0.55rem;
+  border: 1.5px solid #fff;
+  border-radius: 2px;
+}
+
+.nav-ico--send::before {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-top: 1.5px solid #fff;
+  border-right: 1.5px solid #fff;
+  transform: translate(-60%, -50%) rotate(45deg);
+}
+
+.nav-ico--topup::before {
+  width: 1.5px;
+  height: 0.55rem;
+  background: #fff;
+}
+
+.nav-ico--topup::after {
+  width: 0.55rem;
+  height: 1.5px;
+  background: #fff;
+}
+
+.nav-ico--activity::before {
+  width: 0.6rem;
+  height: 1.5px;
+  background: #fff;
+  box-shadow: 0 3px 0 #fff, 0 6px 0 #fff;
+  transform: translate(-50%, calc(-50% - 3px));
+}
+
+.nav-ico--admin::before {
+  width: 0.5rem;
+  height: 0.58rem;
+  border: 1.5px solid #fff;
+  border-radius: 2px 2px 45% 45%;
+}
+
+.nav-ico--cards::before {
+  width: 0.62rem;
+  height: 0.4rem;
+  border: 1.5px solid #fff;
+  border-radius: 2px;
+}
+
+/* Alt sekme çubuğu beyaz zeminde: glifler metin rengini alır */
+.tabbar .nav-ico {
+  width: 1.5rem;
+  height: 1.5rem;
+  background: transparent;
+}
+
+.tabbar .nav-ico--overview::before,
+.tabbar .nav-ico--admin::before,
+.tabbar .nav-ico--cards::before {
+  border-color: currentColor;
+}
+
+.tabbar .nav-ico--send::before {
+  border-top-color: currentColor;
+  border-right-color: currentColor;
+}
+
+.tabbar .nav-ico--topup::before,
+.tabbar .nav-ico--topup::after {
+  background: currentColor;
+}
+
+.tabbar .nav-ico--activity::before {
+  background: currentColor;
+  box-shadow: 0 3px 0 currentColor, 0 6px 0 currentColor;
+}
+
+/* T-072: sol menü kâğıt zeminde; glifler navy */
+.sidebar .nav-ico {
+  background: rgba(27, 42, 74, 0.08);
+  color: var(--navy, #1b2a4a);
+}
+
+.sidebar .nav-ico--overview::before,
+.sidebar .nav-ico--admin::before,
+.sidebar .nav-ico--cards::before {
+  border-color: currentColor;
+}
+
+.sidebar .nav-ico--send::before {
+  border-top-color: currentColor;
+  border-right-color: currentColor;
+}
+
+.sidebar .nav-ico--topup::before,
+.sidebar .nav-ico--topup::after {
+  background: currentColor;
+}
+
+.sidebar .nav-ico--activity::before {
+  background: currentColor;
+  box-shadow: 0 3px 0 currentColor, 0 6px 0 currentColor;
+}
+
+.amount-in {
+  color: var(--teal, #0f766e);
+}
+
+.demo-card {
+  position: relative;
+  margin: 0 0 1rem;
+  padding: 1.15rem 1.2rem 1rem;
+  min-height: 8.5rem;
+  border-radius: var(--radius-lg, 20px);
+  background: var(--hero-grad, linear-gradient(160deg, #24365c 0%, #1b2a4a 62%));
+  color: #fff;
+  box-shadow: var(--elev-3, 0 8px 20px rgba(27, 42, 74, 0.12));
+}
+
+.demo-card-brand {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.demo-card-pan {
+  margin: 1.35rem 0 0.55rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+}
+
+.demo-card-name {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.demo-card-badge {
+  position: absolute;
+  top: 1.15rem;
+  right: 1.15rem;
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.card-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.card-chip {
+  display: inline-block;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--line, #d8dee8);
+  border-radius: var(--radius-pill, 999px);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--navy, #1b2a4a);
+}
+
+.card-chip.is-active {
+  background: var(--navy, #1b2a4a);
+  border-color: var(--navy, #1b2a4a);
+  color: #fff;
+}
+
+.cards-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.live-card-stage {
+  perspective: 920px;
+  margin: 0 0 1.15rem;
+}
+
+.live-card {
+  position: relative;
+  width: 100%;
+  max-width: 22.5rem;
+  height: 13.4rem;
+  transform-style: preserve-3d;
+  transition: transform 220ms ease;
+}
+
+.live-card-stage.is-flipped .live-card {
+  transform: rotateY(180deg);
+}
+
+.live-card-face {
+  position: absolute;
+  inset: 0;
+  padding: 1.15rem 1.2rem 1rem;
+  border-radius: 18px;
+  background: linear-gradient(160deg, #24365c 0%, #1b2a4a 62%);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(27, 42, 74, 0.12);
+  backface-visibility: hidden;
+  overflow: hidden;
+}
+
+.live-card-back {
+  transform: rotateY(180deg);
+  padding-top: 0;
+}
+
+.live-card-brand {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.live-card-scheme {
+  position: absolute;
+  top: 1.15rem;
+  right: 1.15rem;
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  z-index: 1;
+}
+
+.scheme-mark {
+  display: none;
+  position: absolute;
+  top: 0.95rem;
+  right: 1.05rem;
+  width: 3.4rem;
+  height: 2.1rem;
+}
+
+.scheme-orb {
+  position: absolute;
+  top: 0.15rem;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 50%;
+}
+
+.scheme-orb--a {
+  left: 0;
+  background: #eb001b;
+}
+
+.scheme-orb--b {
+  left: 1.15rem;
+  background: #f79e1b;
+  mix-blend-mode: screen;
+}
+
+.live-card[data-scheme="visa"] .live-card-face,
+.demo-card[data-scheme="visa"] {
+  background: linear-gradient(155deg, #1a237e 0%, #0d47a1 48%, #1565c0 100%);
+}
+
+.live-card[data-scheme="visa"] .live-card-scheme,
+.demo-card[data-scheme="visa"] .demo-card-badge {
+  font-style: italic;
+  letter-spacing: 0.22em;
+  color: #fff;
+  opacity: 1;
+}
+
+.live-card[data-scheme="mastercard"] .live-card-face,
+.demo-card[data-scheme="mastercard"] {
+  background: linear-gradient(155deg, #3a3a3a 0%, #1a1a1a 70%);
+}
+
+.live-card[data-scheme="mastercard"] .live-card-scheme,
+.demo-card[data-scheme="mastercard"] .demo-card-badge {
+  opacity: 0;
+}
+
+.live-card[data-scheme="mastercard"] .scheme-mark,
+.demo-card[data-scheme="mastercard"] .scheme-mark,
+.bound-card[data-scheme="mastercard"] .bound-card-mark {
+  display: block;
+}
+
+.live-card[data-scheme="troy"] .live-card-face,
+.demo-card[data-scheme="troy"] {
+  background: linear-gradient(155deg, #0f766e 0%, #134e4a 100%);
+}
+
+.live-card[data-scheme="visa"] .live-card-scheme { color: #fff; }
+.live-card[data-scheme="troy"] .live-card-scheme { color: #99f6e4; }
+
+.live-card-pan {
+  margin: 2.4rem 0 0.85rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+}
+
+.live-card-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.live-card-name,
+.live-card-exp {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.live-card-exp span {
+  display: block;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  font-weight: 600;
+}
+
+.live-card-stripe {
+  height: 2.15rem;
+  margin: 1.35rem 0 1.1rem;
+  background: #111827;
+}
+
+.live-card-cvv-label {
+  margin: 0 1.2rem 0.25rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.live-card-cvv {
+  margin: 0 1.2rem;
+  display: inline-block;
+  min-width: 3.2rem;
+  padding: 0.2rem 0.45rem;
+  background: #fff;
+  color: #1b2a4a;
+  letter-spacing: 0.2em;
+  font-weight: 700;
+}
+
+.live-card-back-note {
+  margin: 0.85rem 1.2rem 0;
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+
+.bound-card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.bound-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "scheme pan" "name name" "cta cta";
+  gap: 0.2rem 0.65rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--line, #d8dee8);
+  border-radius: 14px;
+}
+
+.bound-card-scheme {
+  grid-area: scheme;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--teal, #0f766e);
+}
+
+.bound-card-mark {
+  display: none;
+  grid-area: scheme;
+  position: relative;
+  width: 2.4rem;
+  height: 1.4rem;
+  justify-self: start;
+}
+
+.bound-card[data-scheme="mastercard"] .bound-card-scheme {
+  opacity: 0;
+}
+
+.bound-card[data-scheme="visa"] .bound-card-scheme {
+  font-style: italic;
+  letter-spacing: 0.14em;
+  color: #0d47a1;
+}
+
+.bound-card-mark .scheme-orb {
+  width: 1.25rem;
+  height: 1.25rem;
+  top: 0.05rem;
+}
+
+.bound-card-mark .scheme-orb--b {
+  left: 0.75rem;
+}
+
+.bound-card-pan {
+  grid-area: pan;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.bound-card-name {
+  grid-area: name;
+  color: var(--muted, #5b6b82);
+  font-size: 0.88rem;
+}
+
+.bound-card .btn {
+  grid-area: cta;
+  margin-top: 0.45rem;
+  justify-self: start;
+}
+
+@media (max-width: 900px) {
+  .cards-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-card {
+    transition: none;
+  }
+
+  .live-card-stage.is-flipped .live-card {
+    transform: none;
+  }
+}
+
+@media (max-width: 800px) {
+  .stat-value-xl {
+    font-size: 2.15rem;
+  }
+
+  .wallet-band {
+    padding-right: 1.4rem;
+  }
+
+  .wallet-band .live-pill {
+    position: static;
+    margin: 0 0 0.75rem;
+  }
+}

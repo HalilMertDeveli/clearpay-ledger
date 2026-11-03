@@ -1,0 +1,132 @@
+﻿@using ClearPay.Web.Localization
+@{
+    var page = ViewContext.RouteData.Values["page"]?.ToString();
+    string NavClass(string target) => page == target ? "nav-link is-active" : "nav-link";
+    string TabClass(string target) => page == target ? "tab-link is-active" : "tab-link";
+    var meta = ViewData["MetaDescription"] as string ?? L["MetaDefault"].Value;
+    var title = ViewData["Title"] as string ?? L["Overview"].Value;
+    var isAdmin = User.IsInRole(ClearPay.Domain.Identity.AppRoles.Admin);
+    var contentClass = ViewData["Wide"] as bool? == true ? "content content--wide" : "content";
+    var displayName = User.Identity?.Name;
+    var livePages = new[] { "/Index", "/Hareketler", "/Havale", "/YukleCek", "/Kartlar", "/Admin", "/Dekont" };
+    var liveWallet = livePages.Contains(page);
+}
+<!DOCTYPE html>
+<html lang="@AppCultures.HtmlLang">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@title — ClearPay (Demo)</title>
+    <meta name="theme-color" content="#1B2A4A" />
+    <meta name="description" content="@meta" />
+    <meta property="og:title" content="@title — ClearPay (Demo)" />
+    <meta property="og:description" content="@meta" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="@AppCultures.OgLocale" />
+    <meta name="robots" content="noindex,nofollow" />
+    <link rel="icon" href="~/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/brand.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/motion.css" asp-append-version="true" />
+</head>
+<body data-wallet-hub="@(User.Identity?.IsAuthenticated == true ? "true" : "false")" data-live-wallet="@(liveWallet ? "true" : "false")">
+    <a class="skip-link" href="#main">@L["SkipToContent"]</a>
+    <div class="app-shell">
+        <header class="masthead">
+            <a class="brand masthead-brand" asp-page="/Index">
+                <span class="brand-mark" aria-hidden="true">C</span>
+                <span class="brand-name wordmark">ClearPay</span>
+            </a>
+            <p class="masthead-kicker">@L["WebChannel"]</p>
+            <div class="masthead-end">
+                <div class="masthead-lang lang-picker-on-navy">
+                    <partial name="_LanguagePicker" />
+                </div>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <span class="pill pill-on-navy @(isAdmin ? "pill-admin" : null)">@(isAdmin ? L["RoleAdmin"] : L["RoleCustomer"])</span>
+                    <span class="topbar-user masthead-user">@displayName</span>
+                    <form asp-page="/Account/Logout" method="post" class="topbar-form">
+                        <button type="submit" class="btn-text btn-text-on-navy">@L["SignOut"]</button>
+                    </form>
+                }
+            </div>
+        </header>
+        <aside class="sidebar" id="sidebar">
+            <nav class="side-nav" aria-label="@L["MainMenu"]">
+                <a class="@NavClass("/Index")" asp-page="/Index"><span class="nav-ico nav-ico--overview" aria-hidden="true"></span>@L["NavOverview"]</a>
+                <a class="@NavClass("/Havale")" asp-page="/Havale"><span class="nav-ico nav-ico--send" aria-hidden="true"></span>@L["NavTransfer"]</a>
+                <a class="@NavClass("/Kartlar")" asp-page="/Kartlar"><span class="nav-ico nav-ico--cards" aria-hidden="true"></span>@L["NavCards"]</a>
+                <a class="@NavClass("/YukleCek")" asp-page="/YukleCek"><span class="nav-ico nav-ico--topup" aria-hidden="true"></span>@L["NavTopUpWithdraw"]</a>
+                <a class="@NavClass("/Hareketler")" asp-page="/Hareketler"><span class="nav-ico nav-ico--activity" aria-hidden="true"></span>@L["NavActivity"]</a>
+                @if (isAdmin)
+                {
+                    <a class="@NavClass("/Admin")" asp-page="/Admin"><span class="nav-ico nav-ico--admin" aria-hidden="true"></span>@L["NavAdmin"]</a>
+                }
+            </nav>
+            <div class="sidebar-foot">
+                <p class="sidebar-note">@L["DemoDisclaimer"]</p>
+            </div>
+        </aside>
+        <div class="workspace">
+            <header class="workspace-head">
+                <div class="workspace-head-copy">
+                    @if (User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(displayName))
+                    {
+                        <p class="welcome-line">@L["Welcome"] <strong>@displayName</strong></p>
+                    }
+                    <p class="topbar-title">@title</p>
+                </div>
+                <span class="live-clock" aria-live="polite"></span>
+            </header>
+            <main id="main" class="@contentClass">
+                @RenderBody()
+            </main>
+            <footer class="page-footer">
+                <span>@L["DemoDisclaimer"]</span>
+                <div class="footer-lang">
+                    <partial name="_LanguagePicker" />
+                </div>
+            </footer>
+            <nav class="tabbar" aria-label="@L["MainMenu"]">
+                <a class="@TabClass("/Index")" asp-page="/Index">
+                    <span class="nav-ico nav-ico--overview" aria-hidden="true"></span>
+                    <span class="tab-label">@L["NavOverview"]</span>
+                </a>
+                <a class="@TabClass("/Havale")" asp-page="/Havale">
+                    <span class="nav-ico nav-ico--send" aria-hidden="true"></span>
+                    <span class="tab-label">@L["NavTransfer"]</span>
+                </a>
+                <a class="@TabClass("/Kartlar")" asp-page="/Kartlar">
+                    <span class="nav-ico nav-ico--cards" aria-hidden="true"></span>
+                    <span class="tab-label">@L["NavCards"]</span>
+                </a>
+                <a class="@TabClass("/YukleCek")" asp-page="/YukleCek">
+                    <span class="nav-ico nav-ico--topup" aria-hidden="true"></span>
+                    <span class="tab-label">@L["NavTopUpWithdraw"]</span>
+                </a>
+                <a class="@TabClass("/Hareketler")" asp-page="/Hareketler">
+                    <span class="nav-ico nav-ico--activity" aria-hidden="true"></span>
+                    <span class="tab-label">@L["NavActivity"]</span>
+                </a>
+                @if (isAdmin)
+                {
+                    <a class="@TabClass("/Admin")" asp-page="/Admin">
+                        <span class="nav-ico nav-ico--admin" aria-hidden="true"></span>
+                        <span class="tab-label">@L["NavAdmin"]</span>
+                    </a>
+                }
+            </nav>
+        </div>
+    </div>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <script src="~/js/vendor/signalr.min.js" asp-append-version="true"></script>
+    }
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

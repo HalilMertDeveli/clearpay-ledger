@@ -1,0 +1,59 @@
+## Build
+bin/
+obj/
+out/
+artifacts/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## IDE
+.vs/
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+## Secrets and local configuration (never commit)
+appsettings.*.local.json
+*.pfx
+.env
+.env.*
+!.env.example
+
+## Test / coverage
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+## Docker / logs
+*.log
+docker-data/
+
+## OS
+Thumbs.db
+
+## Local SQLite stores
+src/ClearPay.Web/App_Data/*.db
+src/ClearPay.Web/App_Data/*.db-*
+
+## Flutter (not part of ClearPay.slnx)
+mobile/**/.dart_tool/
+mobile/**/.flutter-plugins
+mobile/**/.flutter-plugins-dependencies
+mobile/**/build/
+mobile/**/.idea/
+mobile/**/android/local.properties
+mobile/**/ios/Flutter/ephemeral/
+mobile/**/windows/flutter/ephemeral/
+*.iml
+
+## Firebase client config, generated per developer by `flutterfire configure`
+mobile/clearpay/lib/firebase_options.dart
+mobile/clearpay/android/app/google-services.json
+mobile/clearpay/ios/Runner/GoogleService-Info.plist
+mobile/clearpay/macos/Runner/GoogleService-Info.plist
+mobile/clearpay/firebase.json
+mobile/clearpay/.firebaserc

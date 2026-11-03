@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dotnet:
+    name: .NET build, test, vulnerability scan
+    runs-on: ubuntu-latest
+    env:
+      # Throw-away password for the ephemeral CI container only. Not used anywhere else.
+      MSSQL_SA_PASSWORD: CI_Only_Throwaway_Pa55!
+      DOTNET_NOLOGO: "true"
+      TEST_PROJECT: tests/ClearPay.Tests/ClearPay.Tests.csproj
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: CI_Only_Throwaway_Pa55!
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'CI_Only_Throwaway_Pa55!' -C -Q 'SELECT 1' -b -o /dev/null"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+          --health-start-period 20s
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore "$TEST_PROJECT"
+
+      - name: Build
+        run: dotnet build "$TEST_PROJECT" --no-restore --configuration Release
+
+      - name: Test (SQLite integration + SQL Server integration)
+        env:
+          # Enables the [SqlServerFact] tests (concurrency, rollback, constraints) against the service container.
+          CLEARPAY_TEST_SQLSERVER: Server=localhost,1433;User Id=sa;Password=${{ env.MSSQL_SA_PASSWORD }};TrustServerCertificate=True;Encrypt=True
+        run: >-
+          dotnet test "$TEST_PROJECT" --no-build --configuration Release
+          --logger "trx;LogFileName=results.trx" --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-test-results
+          path: TestResults
+
+      - name: Vulnerable NuGet packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > vulnerable.txt
+          for project in src/*/*.csproj "$TEST_PROJECT"; do
+            dotnet list "$project" package --vulnerable --include-transitive | tee -a vulnerable.txt
+          done
+          if grep -q "has the following vulnerable packages" vulnerable.txt; then
+            echo "::error::Vulnerable NuGet packages found"
+            exit 1
+          fi
+
+  flutter:
+    name: Flutter analyze and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile/clearpay
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Firebase options placeholder (real config is never committed)
+        run: cp firebase_options.template.dart lib/firebase_options.dart
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test

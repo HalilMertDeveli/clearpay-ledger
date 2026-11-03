@@ -1,0 +1,45 @@
+# Local infrastructure for ClearPay. The web host is not a Compose service:
+#   cp .env.example .env          # then set MSSQL_SA_PASSWORD to your own local value
+#   docker compose up -d
+#   dotnet run --project src/ClearPay.Web --launch-profile http
+#
+# SQL Server is the source of truth (ledger + Identity). Redis only caches the
+# wallet summary; RabbitMQ only receives copies of committed outbox rows.
+# Both are optional: the app degrades to SQL-only reads and log-only publishing.
+services:
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: clearpay-sql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env (see .env.example)}"
+    ports:
+      - "1433:1433"
+    volumes:
+      - clearpay-sql:/var/opt/mssql
+
+  redis:
+    image: redis:7-alpine
+    container_name: clearpay-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - clearpay-redis:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: clearpay-rabbit
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_USER:-guest}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASS:-guest}"
+    volumes:
+      - clearpay-rabbit:/var/lib/rabbitmq
+
+volumes:
+  clearpay-sql:
+  clearpay-redis:
+  clearpay-rabbit:

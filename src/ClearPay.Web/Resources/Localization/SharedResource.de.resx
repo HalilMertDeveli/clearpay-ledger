@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>  <data name="AccountStatus" xml:space="preserve"><value>Kontostatus</value></data>
+  <data name="Admin" xml:space="preserve"><value>Admin</value></data>
+  <data name="NavAdmin" xml:space="preserve"><value>Admin</value></data>
+  <data name="AdminFreeze" xml:space="preserve"><value>Wallet sperren</value></data>
+  <data name="AdminFreezeMiss" xml:space="preserve"><value>Keine Wallet zu dieser E-Mail.</value></data>
+  <data name="AdminFreezeOk" xml:space="preserve"><value>Wallet gesperrt. Senden und Abheben blockiert.</value></data>
+  <data name="AuditSearch" xml:space="preserve"><value>Audit suchen</value></data>
+  <data name="EmptyQueue" xml:space="preserve"><value>Fehler-Queue ist leer.</value></data>
+  <data name="FailedQueue" xml:space="preserve"><value>Fehler-Queue</value></data>
+  <data name="Freeze" xml:space="preserve"><value>Sperren</value></data>
+  <data name="MetaAdmin" xml:space="preserve"><value>Admin: Sperre, Queue, Audit. Demo — gefälschtes Gateway für Aufladungen.</value></data>
+  <data name="Requeue" xml:space="preserve"><value>Erneut einreihen</value></data>
+  <data name="Activity" xml:space="preserve"><value>Bewegungen</value></data>
+  <data name="ActivityLede" xml:space="preserve"><value>Überweisungen, Aufladungen und Abhebungen Ihrer Wallet.</value></data>
+  <data name="AmountTry" xml:space="preserve"><value>Betrag (₺)</value></data>
+  <data name="AvailableBalance" xml:space="preserve"><value>Verfügbares Guthaben</value></data>
+  <data name="BackToWallet" xml:space="preserve"><value>Zurück zur Wallet</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Abbrechen</value></data>
+  <data name="WebChannel" xml:space="preserve"><value>Internet</value></data>
+  <data name="Welcome" xml:space="preserve"><value>Willkommen</value></data>
+  <data name="QuickOps" xml:space="preserve"><value>Schnellzugriff</value></data>
+  <data name="AddCard" xml:space="preserve"><value>Karte hinzufügen</value></data>
+  <data name="CardAddFail" xml:space="preserve"><value>Karte nicht gespeichert. Demo-Nummer (4111…) oder letzte 4 Ziffern. CVV wird nicht gespeichert. Höchstens 5 Karten.</value></data>
+  <data name="CardAddOk" xml:space="preserve"><value>Demo-Karte verknüpft. Aufladen nutzt die letzten 4 Ziffern.</value></data>
+  <data name="CardHint" xml:space="preserve"><value>Vom verknüpften Konto aufladen. Neue Karten unter Meine Karten.</value></data>
+  <data name="CardLabel" xml:space="preserve"><value>Kartenname</value></data>
+  <data name="CardLast4" xml:space="preserve"><value>Letzte 4 Ziffern</value></data>
+  <data name="LinkedCard" xml:space="preserve"><value>Verknüpfte Karte</value></data>
+  <data name="NoLinkedCard" xml:space="preserve"><value>Noch keine Karte.</value></data>
+  <data name="SelectCard" xml:space="preserve"><value>Karte wählen</value></data>
+  <data name="NavCards" xml:space="preserve"><value>Meine Karten</value></data>
+  <data name="CardsLede" xml:space="preserve"><value>Karte verknüpfen; die Vorschau folgt der Eingabe. Aufladen über das Demo-Gateway.</value></data>
+  <data name="MetaCards" xml:space="preserve"><value>Verknüpfte Karten. Demo — volle Nummer und CVV werden nicht gespeichert.</value></data>
+  <data name="CardNumber" xml:space="preserve"><value>Kartennummer</value></data>
+  <data name="CardHolder" xml:space="preserve"><value>Name auf der Karte</value></data>
+  <data name="CardExpiry" xml:space="preserve"><value>Gültig bis</value></data>
+  <data name="CardCvv" xml:space="preserve"><value>CVV</value></data>
+  <data name="CardCvvHint" xml:space="preserve"><value>CVV wird nicht gespeichert</value></data>
+  <data name="CardNickname" xml:space="preserve"><value>Kartenname (z. B. Yapı Kredi)</value></data>
+  <data name="LoadFromCard" xml:space="preserve"><value>Wallet von dieser Karte aufladen</value></data>
+  <data name="CardSchemeUnknown" xml:space="preserve"><value>Karte</value></data>
+  <data name="CardsEmptyHint" xml:space="preserve"><value>Demo-Nummer: 4111 1111 1111 1111. Troy 9792…. Yapı Kredi ist ein Spitzname, kein Schema.</value></data>
+  <data name="CardBindHint" xml:space="preserve"><value>Live-Vorschau. Gespeichert: letzte 4 + Name + Schema (Visa/Mastercard/Troy). Kein echtes POS.</value></data>
+  <data name="ColAmount" xml:space="preserve"><value>Betrag</value></data>
+  <data name="ColCounterparty" xml:space="preserve"><value>Gegenpartei</value></data>
+  <data name="ColDate" xml:space="preserve"><value>Datum</value></data>
+  <data name="ColRef" xml:space="preserve"><value>Vorgangs-Nr.</value></data>
+  <data name="ColStatus" xml:space="preserve"><value>Status</value></data>
+  <data name="ColTxn" xml:space="preserve"><value>Vorgang</value></data>
+  <data name="ConfirmPassword" xml:space="preserve"><value>Passwort wiederholen</value></data>
+  <data name="CreateAccount" xml:space="preserve"><value>Konto erstellen</value></data>
+  <data name="CreditParty" xml:space="preserve"><value>Haben</value></data>
+  <data name="DebitParty" xml:space="preserve"><value>Soll</value></data>
+  <data name="Receipt" xml:space="preserve"><value>Beleg</value></data>
+  <data name="MetaReceipt" xml:space="preserve"><value>Beleg mit Correlation-ID. Demo — gefälschtes Gateway für Aufladungen.</value></data>
+  <data name="DemoDisclaimer" xml:space="preserve"><value>Demo — gefälschtes Gateway für Aufladungen</value></data>
+  <data name="DemoWallet" xml:space="preserve"><value>Demo-Wallet</value></data>
+  <data name="Description" xml:space="preserve"><value>Verwendungszweck</value></data>
+  <data name="DestinationAccount" xml:space="preserve"><value>Zielkonto</value></data>
+  <data name="DuplicateEmail" xml:space="preserve"><value>Diese E-Mail ist bereits registriert.</value></data>
+  <data name="Email" xml:space="preserve"><value>E-Mail</value></data>
+  <data name="EmptyMovementsHint" xml:space="preserve"><value>Ihre erste Überweisung oder Aufladung erscheint hier.</value></data>
+  <data name="EmptyMovementsTitle" xml:space="preserve"><value>Noch keine Bewegungen.</value></data>
+  <data name="EmptyPeriodHint" xml:space="preserve"><value>Erweitern Sie Datum oder Art, oder senden Sie die erste Überweisung von der Übersicht.</value></data>
+  <data name="EmptyPeriodTitle" xml:space="preserve"><value>In diesem Zeitraum keine Bewegungen.</value></data>
+  <data name="Error" xml:space="preserve"><value>Fehler</value></data>
+  <data name="ErrorLede" xml:space="preserve"><value>Es ist ein Fehler aufgetreten</value></data>
+  <data name="Filter" xml:space="preserve"><value>Filtern</value></data>
+  <data name="FundingGatewayFailed" xml:space="preserve"><value>Das Fake-Bank-Gateway hat die Anfrage abgelehnt.</value></data>
+  <data name="FundingReplay" xml:space="preserve"><value>Diese Aufladung/Abhebung wurde bereits ausgeführt; der Saldo hat sich nicht erneut geändert.</value></data>
+  <data name="FundingTimeout" xml:space="preserve"><value>Die Bank hat nicht geantwortet (Timeout). Ledger nicht gebucht; Auftrag in der Queue.</value></data>
+  <data name="WithdrawFrozen" xml:space="preserve"><value>Ihr Konto ist gesperrt; Abheben nicht möglich.</value></data>
+  <data name="TopUpSuccess" xml:space="preserve"><value>Aufladung abgeschlossen. Saldo ist das Ledger-Netto.</value></data>
+  <data name="WithdrawSuccess" xml:space="preserve"><value>Abhebung abgeschlossen. Saldo ist das Ledger-Netto.</value></data>
+  <data name="FilterAll" xml:space="preserve"><value>Alle</value></data>
+  <data name="FilterFrom" xml:space="preserve"><value>Von</value></data>
+  <data name="FilterTo" xml:space="preserve"><value>Bis</value></data>
+  <data name="FilterStatus" xml:space="preserve"><value>Status</value></data>
+  <data name="FilterType" xml:space="preserve"><value>Art</value></data>
+  <data name="FullName" xml:space="preserve"><value>Name</value></data>
+  <data name="HaveAccount" xml:space="preserve"><value>Bereits ein Konto?</value></data>
+  <data name="HistoryKicker" xml:space="preserve"><value>Verlauf</value></data>
+  <data name="InvalidCredentials" xml:space="preserve"><value>E-Mail oder Passwort ist falsch.</value></data>
+  <data name="InvalidEmail" xml:space="preserve"><value>Geben Sie eine gültige E-Mail ein.</value></data>
+  <data name="Language" xml:space="preserve"><value>Sprache</value></data>
+  <data name="LinkedAccount" xml:space="preserve"><value>Verknüpftes Konto</value></data>
+  <data name="LiveBadge" xml:space="preserve"><value>Live</value></data>
+  <data name="MainMenu" xml:space="preserve"><value>Hauptmenü</value></data>
+  <data name="MetaActivity" xml:space="preserve"><value>Wallet-Bewegungen. Demo — gefälschtes Gateway für Aufladungen.</value></data>
+  <data name="MetaDefault" xml:space="preserve"><value>ASP.NET Core 8 Digital-Wallet-Demo. Demo — gefälschtes Gateway für Aufladungen.</value></data>
+  <data name="MetaOverview" xml:space="preserve"><value>Wallet-Saldo, Zu- und Abgänge in diesem Monat, letzte Bewegungen. Demo — gefälschtes Gateway für Aufladungen.</value></data>
+  <data name="MetaRegister" xml:space="preserve"><value>Kundenkonto für die Portfolio-Wallet eröffnen. Demo — gefälschtes Gateway für Aufladungen.</value></data>
+  <data name="MetaSignIn" xml:space="preserve"><value>ASP.NET Core 8 Digital-Wallet-Demo. Anmelden. Demo — gefälschtes Gateway für Aufladungen.</value></data>
+  <data name="MetaTopUpWithdraw" xml:space="preserve"><value>Wallet aufladen oder Guthaben abheben. Demo — gefälschtes Gateway für Aufladungen.</value></data>
+  <data name="MetaTransfer" xml:space="preserve"><value>Wallet-zu-Wallet-Überweisung (Demo). Demo — gefälschtes Gateway für Aufladungen.</value></data>
+  <data name="MonthIn" xml:space="preserve"><value>Diesen Monat eingehend</value></data>
+  <data name="MonthOut" xml:space="preserve"><value>Diesen Monat ausgehend</value></data>
+  <data name="NavActivity" xml:space="preserve"><value>Bewegungen</value></data>
+  <data name="NavOverview" xml:space="preserve"><value>Übersicht</value></data>
+  <data name="NavTopUpWithdraw" xml:space="preserve"><value>Aufladen / Abheben</value></data>
+  <data name="NavTransfer" xml:space="preserve"><value>Überweisung</value></data>
+  <data name="NoAccount" xml:space="preserve"><value>Noch kein Konto?</value></data>
+  <data name="OpenMenu" xml:space="preserve"><value>Menü öffnen</value></data>
+  <data name="Overview" xml:space="preserve"><value>Übersicht</value></data>
+  <data name="Password" xml:space="preserve"><value>Passwort</value></data>
+  <data name="PasswordHint" xml:space="preserve"><value>Mindestens 8 Zeichen, ein Kleinbuchstabe und eine Ziffer.</value></data>
+  <data name="PasswordRequiresDigit" xml:space="preserve"><value>Das Passwort muss mindestens eine Ziffer enthalten.</value></data>
+  <data name="PasswordRequiresLower" xml:space="preserve"><value>Das Passwort muss mindestens einen Kleinbuchstaben enthalten.</value></data>
+  <data name="PasswordTooShort" xml:space="preserve"><value>Das Passwort muss mindestens 8 Zeichen haben.</value></data>
+  <data name="RecentActivity" xml:space="preserve"><value>Letzte Bewegungen</value></data>
+  <data name="RecipientEmail" xml:space="preserve"><value>Empfänger (E-Mail)</value></data>
+  <data name="Register" xml:space="preserve"><value>Registrierung</value></data>
+  <data name="RegisterLede" xml:space="preserve"><value>Eröffnen Sie ein Kundenkonto mit Name, E-Mail, Mobilnummer und Kontotyp.</value></data>
+  <data name="RemainingBalance" xml:space="preserve"><value>Verbleibendes Guthaben</value></data>
+  <data name="RequestId" xml:space="preserve"><value>Anfrage-Nr.</value></data>
+  <data name="RoleCustomer" xml:space="preserve"><value>Kunde</value></data>
+  <data name="RoleAdmin" xml:space="preserve"><value>Admin</value></data>
+  <data name="Send" xml:space="preserve"><value>Senden</value></data>
+  <data name="SendTransfer" xml:space="preserve"><value>Überweisung senden</value></data>
+  <data name="SignIn" xml:space="preserve"><value>Anmelden</value></data>
+  <data name="SignInLede" xml:space="preserve"><value>Melden Sie sich mit E-Mail oder Demo-TC und Passwort an.</value></data>
+  <data name="SignInWithApple" xml:space="preserve"><value>Mit Apple anmelden</value></data>
+  <data name="SignInWithGoogle" xml:space="preserve"><value>Mit Google anmelden</value></data>
+  <data name="SignOut" xml:space="preserve"><value>Abmelden</value></data>
+  <data name="SkipToContent" xml:space="preserve"><value>Zum Inhalt</value></data>
+  <data name="RememberMe" xml:space="preserve"><value>Angemeldet bleiben</value></data>
+  <data name="CopyRef" xml:space="preserve"><value>Kopieren</value></data>
+  <data name="Copied" xml:space="preserve"><value>Kopiert</value></data>
+  <data name="PrintReceipt" xml:space="preserve"><value>Drucken</value></data>
+  <data name="DownloadPdf" xml:space="preserve"><value>PDF herunterladen</value></data>
+  <data name="AccessDeniedTitle" xml:space="preserve"><value>Zugriff verweigert</value></data>
+  <data name="AccessDeniedHint" xml:space="preserve"><value>Sie haben keine Berechtigung für diese Seite. Zurück zur Wallet-Übersicht.</value></data>
+  <data name="SocialEmailRequired" xml:space="preserve"><value>Der Anbieter hat keine E-Mail gesendet. Registrieren Sie sich mit E-Mail und Passwort.</value></data>
+  <data name="SocialLoginFailed" xml:space="preserve"><value>Soziale Anmeldung fehlgeschlagen.</value></data>
+  <data name="SocialNotConfigured" xml:space="preserve"><value>{0}-Anmeldung ist nicht konfiguriert. Client-ID und Secret gehören in user-secrets oder Azure App Settings.</value></data>
+  <data name="OrContinueWith" xml:space="preserve"><value>oder</value></data>
+  <data name="SourceAccount" xml:space="preserve"><value>Quellkonto</value></data>
+  <data name="StatusActive" xml:space="preserve"><value>Aktiv</value></data>
+  <data name="StatusCompleted" xml:space="preserve"><value>Abgeschlossen</value></data>
+  <data name="StatusFrozen" xml:space="preserve"><value>Gesperrt</value></data>
+  <data name="StatusPending" xml:space="preserve"><value>Ausstehend</value></data>
+  <data name="TopUp" xml:space="preserve"><value>Aufladen</value></data>
+  <data name="TopUpHint" xml:space="preserve"><value>Überträgt Guthaben in die Wallet. Demo: TIMEOUT im Kontofeld — kein Ledger, Queue-Zeile bleibt.</value></data>
+  <data name="TopUpWithdraw" xml:space="preserve"><value>Aufladen / Abheben</value></data>
+  <data name="TopUpWithdrawLede" xml:space="preserve"><value>Laden Sie von Ihrem verknüpften Konto auf oder heben Sie Guthaben ab.</value></data>
+  <data name="Transfer" xml:space="preserve"><value>Überweisung</value></data>
+  <data name="TransferFrozen" xml:space="preserve"><value>Ihr Konto ist gesperrt; Senden ist nicht möglich.</value></data>
+  <data name="TransferHint" xml:space="preserve"><value>Guthaben {0} — Senden wird freigegeben, sobald das Guthaben reicht.</value></data>
+  <data name="TransferInsufficient" xml:space="preserve"><value>Ihr Guthaben reicht für diesen Betrag nicht.</value></data>
+  <data name="TransferInvalidAmount" xml:space="preserve"><value>Der Betrag muss größer als null sein (höchstens zwei Dezimalstellen).</value></data>
+  <data name="TransferMissingKey" xml:space="preserve"><value>Sendeschlüssel fehlt. Seite neu laden und erneut versuchen.</value></data>
+  <data name="TransferRecipientMissing" xml:space="preserve"><value>Kein Empfänger mit dieser E-Mail registriert.</value></data>
+  <data name="TransferReplay" xml:space="preserve"><value>Diese Überweisung wurde bereits ausgeführt; das Guthaben wurde nicht erneut belastet.</value></data>
+  <data name="TransferSelf" xml:space="preserve"><value>Sie können nicht an sich selbst senden.</value></data>
+  <data name="TransferSuccess" xml:space="preserve"><value>Überweisung abgeschlossen. Saldo ist das Ledger-Netto.</value></data>
+  <data name="TransferUnavailable" xml:space="preserve"><value>Das Ledger ist gerade nicht erreichbar. Nichts wurde belastet. Bitte in wenigen Sekunden erneut versuchen.</value></data>
+  <data name="TransferKicker" xml:space="preserve"><value>Transfer</value></data>
+  <data name="TransferLede" xml:space="preserve"><value>Senden Sie Betrag und Verwendungszweck an einen registrierten Empfänger.</value></data>
+  <data name="ViewAll" xml:space="preserve"><value>Alle anzeigen</value></data>
+  <data name="WalletBalance" xml:space="preserve"><value>Wallet-Saldo</value></data>
+  <data name="WalletKicker" xml:space="preserve"><value>Wallet</value></data>
+  <data name="WalletActions" xml:space="preserve"><value>Wallet-Aktionen</value></data>
+  <data name="Withdraw" xml:space="preserve"><value>Abheben</value></data>
+  <data name="WithdrawHint" xml:space="preserve"><value>Abhebungen sind nur bis zum verfügbaren Guthaben möglich.</value></data>
+  <data name="ConfirmTransfer" xml:space="preserve"><value>Überweisung bestätigen</value></data>
+  <data name="ConfirmAndSend" xml:space="preserve"><value>Bestätigen und senden</value></data>
+  <data name="EditTransfer" xml:space="preserve"><value>Bearbeiten</value></data>
+  <data name="AfterSendBalance" xml:space="preserve"><value>Saldo nach dem Senden</value></data>
+  <data name="IdempotencyHint" xml:space="preserve"><value>Dieselbe Überweisung wird nicht zweimal belastet (409).</value></data>
+  <data name="Unfreeze" xml:space="preserve"><value>Entsperren</value></data>
+  <data name="AdminUnfreezeOk" xml:space="preserve"><value>Wallet entsperrt. Senden und Abheben sind offen.</value></data>
+  <data name="AdminUnfreezeMiss" xml:space="preserve"><value>Keine Wallet zu dieser E-Mail.</value></data>
+  <data name="AccountHintLabel" xml:space="preserve"><value>Konto / Karte</value></data>
+  <data name="TransferRecipientRequired" xml:space="preserve"><value>Empfänger-E-Mail ist erforderlich.</value></data>
+  <data name="EmptyQueueHint" xml:space="preserve"><value>Timeout-Zeilen bleiben hier; Erneut einreihen wiederholt sie.</value></data>
+  <data name="Phone" xml:space="preserve"><value>Telefon</value></data>
+  <data name="PhoneHint" xml:space="preserve"><value>TR-Handy: 5xx. Kein SMS / Mernis.</value></data>
+  <data name="PhoneRequired" xml:space="preserve"><value>Telefon ist erforderlich.</value></data>
+  <data name="PhoneTaken" xml:space="preserve"><value>Diese Nummer ist bereits einem anderen Konto zugeordnet.</value></data>
+  <data name="AccountKind" xml:space="preserve"><value>Kontotyp</value></data>
+  <data name="AccountKindHint" xml:space="preserve"><value>Dieselben 8 Vorgänge. Kein Händler-POS.</value></data>
+  <data name="AccountKindIndividual" xml:space="preserve"><value>Privat</value></data>
+  <data name="AccountKindCorporate" xml:space="preserve"><value>Geschäftlich</value></data>
+  <data name="SignInTabEmail" xml:space="preserve"><value>E-Mail</value></data>
+  <data name="SignInTabTc" xml:space="preserve"><value>TC (Demo)</value></data>
+  <data name="SignInTcHint" xml:space="preserve"><value>Kein Mernis. Demo 10000000146 → admin@clearpay.test</value></data>
+  <data name="SignInTcUnknown" xml:space="preserve"><value>Diese Demo-TC ist nicht hinterlegt.</value></data>
+</root>

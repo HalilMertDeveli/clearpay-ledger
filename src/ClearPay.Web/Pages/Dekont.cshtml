@@ -1,0 +1,70 @@
+@page "/dekont/{correlationId}"
+@model DekontModel
+@{
+    ViewData["Title"] = L["Receipt"].Value;
+    ViewData["MetaDescription"] = L["MetaReceipt"].Value;
+    var r = Model.Receipt!;
+}
+
+<p class="page-kicker">@L["Receipt"]</p>
+<h1 class="page-title">@L["Receipt"]</h1>
+
+@if (TempData["Flash"] is string flash)
+{
+    <p class="flash-ok" role="status" aria-live="polite">@flash</p>
+}
+
+<section class="panel receipt-sheet">
+    <div class="receipt-amount">
+        <p class="stat-label">@L["AmountTry"]</p>
+        <p class="stat-value stat-value-xl">@ClearPay.Web.Presentation.MoneyDisplay.FormatTry(r.Amount)</p>
+        <p class="status-line"><span class="badge-active">@L["StatusCompleted"]</span></p>
+    </div>
+    <dl class="receipt-list">
+        <div class="receipt-row">
+            <dt>@L["ColDate"]</dt>
+            <dd>@r.At.ToLocalTime().ToString("g")</dd>
+        </div>
+        <div class="receipt-row">
+            <dt>@L["FilterType"]</dt>
+            <dd>@r.Kind</dd>
+        </div>
+        <div class="receipt-row">
+            <dt>@L["DebitParty"]</dt>
+            <dd>@r.DebitParty</dd>
+        </div>
+        <div class="receipt-row">
+            <dt>@L["CreditParty"]</dt>
+            <dd>@r.CreditParty</dd>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(r.Description))
+        {
+            <div class="receipt-row">
+                <dt>@L["Description"]</dt>
+                <dd>@r.Description</dd>
+            </div>
+        }
+        <div class="receipt-row">
+            <dt>@L["ColRef"]</dt>
+            <dd class="receipt-ref">
+                <code class="mono" id="corr">@r.CorrelationId</code>
+                <button type="button"
+                        class="btn-text"
+                        data-copy="@r.CorrelationId"
+                        data-copied="@L["Copied"]">@L["CopyRef"]</button>
+            </dd>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(r.InstrumentHint))
+        {
+            <div class="receipt-row">
+                <dt>@L["AccountHintLabel"]</dt>
+                <dd class="mono">@r.InstrumentHint</dd>
+            </div>
+        }
+    </dl>
+    <div class="form-actions">
+        <a class="btn" asp-page="/Dekont" asp-route-correlationId="@r.CorrelationId" asp-page-handler="Pdf">@L["DownloadPdf"]</a>
+        <button type="button" class="btn btn-ghost" data-print>@L["PrintReceipt"]</button>
+        <a class="btn btn-ghost" asp-page="/Hareketler">@L["BackToWallet"]</a>
+    </div>
+</section>
