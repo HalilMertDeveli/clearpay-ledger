@@ -24,23 +24,23 @@ public sealed class FakeAcsModel : PageModel
     [BindProperty]
     public string? Otp { get; set; }
 
-    public AcsChallenge? Challenge { get; private set; }
+    public AcsChallenge? ChallengeData { get; private set; }
 
     public AcsChallengeResult? Result { get; private set; }
 
     public IActionResult OnGet()
     {
-        Challenge = _acs.ReadChallenge(Creq);
-        return Challenge is null ? BadRequest("Invalid or tampered challenge request.") : Page();
+        ChallengeData = _acs.ReadChallenge(Creq);
+        return ChallengeData is null ? BadRequest("Invalid or tampered challenge request.") : Page();
     }
 
     public IActionResult OnPost(string? action)
     {
-        Challenge = _acs.ReadChallenge(Creq);
-        if (Challenge is null)
+        ChallengeData = _acs.ReadChallenge(Creq);
+        if (ChallengeData is null)
             return BadRequest("Invalid or tampered challenge request.");
 
-        Result = _acs.Complete(Challenge, Otp, cancelled: string.Equals(action, "cancel", StringComparison.Ordinal));
+        Result = _acs.Complete(ChallengeData, Otp, cancelled: string.Equals(action, "cancel", StringComparison.Ordinal));
         return Page();
     }
 }

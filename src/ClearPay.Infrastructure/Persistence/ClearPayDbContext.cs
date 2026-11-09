@@ -1,6 +1,5 @@
 using ClearPay.Domain.Ledger;
 using ClearPay.Domain.Payments;
-using ClearPay.Domain.Payments;
 using Microsoft.EntityFrameworkCore;
 
 namespace ClearPay.Infrastructure.Persistence;
@@ -31,6 +30,13 @@ public sealed class ClearPayDbContext : DbContext
     public DbSet<LinkedInstrument> LinkedInstruments => Set<LinkedInstrument>();
 
     public DbSet<ThreeDsSession> ThreeDsSessions => Set<ThreeDsSession>();
+
+    public DbSet<CardPayment> CardPayments => Set<CardPayment>();
+
+    public DbSet<PaymentOperation> PaymentOperations => Set<PaymentOperation>();
+
+    /// <summary>Fake PSPs' own journal ("sim" schema). Only the simulators write it.</summary>
+    public DbSet<SimPspTransaction> SimPspTransactions => Set<SimPspTransaction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
