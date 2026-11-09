@@ -28,4 +28,10 @@ public sealed class OutboxMessage
     public int Attempts { get; set; }
 
     public string? LastError { get; set; }
+
+    /// <summary>
+    /// W3C traceparent of the request that wrote the row. The outbox worker publishes later, in another
+    /// process step; it continues this trace so a payment stays one trace across services.
+    /// </summary>
+    public string? TraceParent { get; set; }
 }

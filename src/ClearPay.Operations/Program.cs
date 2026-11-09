@@ -6,6 +6,7 @@ using ClearPay.Operations.Consumers;
 using ClearPay.Operations.Data;
 using ClearPay.Operations.Notifications;
 using ClearPay.Operations.Reconciliation;
+using ClearPay.ServiceDefaults;
 using Hangfire;
 using Hangfire.MemoryStorage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -16,6 +17,7 @@ using Microsoft.IdentityModel.Tokens;
 // In: RabbitMQ events from the ledger host and PSP settlement files. Out: notifications and reconciliation reports.
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
+builder.AddClearPayObservability("clearpay-operations");
 
 var connection = configuration.GetConnectionString("Operations")
     ?? throw new InvalidOperationException("ConnectionStrings:Operations is required (the service's own database).");
@@ -102,6 +104,7 @@ if (hangfire)
         .AddOrUpdate<ReconciliationJob>("clearpay-ops-reconciliation-nightly", j => j.Run(), Cron.Daily(2, 30));
 }
 
+app.UseClearPayObservability();
 app.UseAuthentication();
 app.UseAuthorization();
 

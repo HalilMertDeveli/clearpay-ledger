@@ -31,6 +31,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ClearPay.Application\ClearPay.Application.csproj" />
     <ProjectReference Include="..\ClearPay.Messaging\ClearPay.Messaging.csproj" />
+    <ProjectReference Include="..\ClearPay.ServiceDefaults\ClearPay.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -47,4 +47,29 @@ public sealed class ClearPayDbContext : DbContext
             type => type.Namespace == "ClearPay.Infrastructure.Persistence.Configurations");
         ClearPay.Messaging.InboxModel.Apply(modelBuilder);
     }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        StampTraceContext();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        StampTraceContext();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>New outbox rows remember the trace they were written in (see <see cref="OutboxMessage.TraceParent"/>).</summary>
+    private void StampTraceContext()
+    {
+        var current = System.Diagnostics.Activity.Current;
+        if (current is null || current.IdFormat != System.Diagnostics.ActivityIdFormat.W3C)
+            return;
+        foreach (var entry in ChangeTracker.Entries<OutboxMessage>())
+        {
+            if (entry.State == EntityState.Added && entry.Entity.TraceParent is null)
+                entry.Entity.TraceParent = current.Id;
+        }
+    }
 }

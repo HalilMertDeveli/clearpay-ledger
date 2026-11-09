@@ -4,6 +4,7 @@ using ClearPay.Infrastructure.DependencyInjection;
 using ClearPay.Infrastructure.Messaging;
 using ClearPay.Infrastructure.Identity;
 using ClearPay.Infrastructure.Persistence;
+using ClearPay.ServiceDefaults;
 using ClearPay.Web;
 using ClearPay.Application.Ports;
 using ClearPay.Web.Localization;
@@ -12,6 +13,7 @@ using ClearPay.Web.Realtime;
 using FluentValidation;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddClearPayObservability("clearpay-ledger");
 
 builder.Services.AddProblemDetails();
 builder.Services.AddClearPayAzureHosting(builder.Environment);
@@ -41,6 +43,7 @@ builder.Services.AddScoped<IWalletLiveNotifier, SignalRWalletLiveNotifier>();
 var app = builder.Build();
 
 app.UseClearPayForwardedHeaders();
+app.UseClearPayObservability();
 await IdentitySeeder.EnsureCreatedAndRolesAsync(app.Services);
 if (app.Configuration.GetValue("ClearPay:ApplyLedgerMigrations", true))
 {

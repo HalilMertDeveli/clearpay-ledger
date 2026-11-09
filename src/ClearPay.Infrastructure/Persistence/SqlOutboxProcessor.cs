@@ -39,6 +39,13 @@ public sealed class SqlOutboxProcessor : IOutboxProcessor
         var sent = 0;
         foreach (var message in pending)
         {
+            // Continue the trace of the request that wrote the row (the job itself has no useful parent).
+            System.Diagnostics.ActivityContext.TryParse(message.TraceParent, null, isRemote: true, out var parent);
+            using var span = Telemetry.ClearPayTelemetry.Outbox.StartActivity(
+                $"outbox {message.Type}", System.Diagnostics.ActivityKind.Producer, parent);
+            span?.SetTag("messaging.message.id", message.Id.ToString());
+            span?.SetTag("clearpay.correlation_id", message.CorrelationId.ToString());
+            span?.SetTag("clearpay.outbox.attempts", message.Attempts);
             try
             {
                 await _publisher
@@ -51,6 +58,7 @@ public sealed class SqlOutboxProcessor : IOutboxProcessor
             }
             catch (Exception ex)
             {
+                span?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, ex.Message);
                 message.Attempts++;
                 message.LastError = ex.Message.Length > 400 ? ex.Message[..400] : ex.Message;
                 if (message.Attempts >= MaxAttempts)

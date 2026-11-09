@@ -1,0 +1,59 @@
+# Local observability stack for ClearPay (demo only, no auth, bound to 127.0.0.1).
+#   docker compose -f docker-compose.observability.yml up -d
+# Then run both hosts with:
+#   Otel__Endpoint=http://localhost:4317   Seq__Url=http://localhost:5341
+#
+# Traces: app --OTLP--> collector --> Tempo (Grafana "Explore") and Seq (traces + logs together)
+# Metrics: app --OTLP--> collector --prometheus exporter--> Prometheus --> Grafana
+# Logs: Serilog --> Seq (each event carries TraceId / SpanId)
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: clearpay-obs-otel-collector
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "127.0.0.1:4317:4317"   # OTLP gRPC (apps)
+      - "127.0.0.1:4318:4318"   # OTLP HTTP
+      - "127.0.0.1:8889:8889"   # Prometheus exporter (scraped by Prometheus)
+    depends_on: [tempo, seq]
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: clearpay-obs-tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml:ro
+    ports:
+      - "127.0.0.1:3200:3200"
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: clearpay-obs-prometheus
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: clearpay-obs-grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on: [tempo, prometheus]
+
+  seq:
+    image: datalust/seq:2024.3
+    container_name: clearpay-obs-seq
+    environment:
+      ACCEPT_EULA: "Y"
+    ports:
+      - "127.0.0.1:5341:80"     # UI + ingestion (Serilog sink, OTLP /ingest/otlp)

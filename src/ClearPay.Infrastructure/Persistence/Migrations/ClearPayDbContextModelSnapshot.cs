@@ -197,6 +197,10 @@ namespace ClearPay.Infrastructure.Persistence.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(128)
