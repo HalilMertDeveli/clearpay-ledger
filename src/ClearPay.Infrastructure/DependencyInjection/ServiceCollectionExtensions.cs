@@ -5,6 +5,7 @@ using ClearPay.Infrastructure.Identity;
 using ClearPay.Infrastructure.Documents;
 using ClearPay.Infrastructure.Jobs;
 using ClearPay.Infrastructure.Messaging;
+using ClearPay.Infrastructure.Messaging.Handlers;
 using ClearPay.Application.Payments;
 using ClearPay.Infrastructure.Payments;
 using ClearPay.Infrastructure.Payments.Psp;
@@ -20,7 +21,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using RabbitMQ.Client;
+
 using StackExchange.Redis;
 
 namespace ClearPay.Infrastructure.DependencyInjection;
@@ -194,21 +195,21 @@ public static class ServiceCollectionExtensions
 
     private static void AddRabbit(IServiceCollection services, IConfiguration configuration)
     {
+        var options = RabbitOptions.From(configuration);
+        services.AddSingleton(options);
+        services.AddSingleton<RabbitConnectionProvider>();
+        services.AddSingleton<RabbitRuntimeStatus>();
         services.AddSingleton<LoggingOutboxPublisher>();
-        var connection = RabbitConnectionFactory.TryCreate(configuration.GetConnectionString("RabbitMq"));
-        if (connection is null)
-        {
-            var empty = configuration.GetConnectionString("RabbitMq");
-            services.AddSingleton(new RabbitRuntimeStatus(string.IsNullOrWhiteSpace(empty) ? "off" : "down"));
-            services.AddScoped<IOutboxPublisher>(sp => sp.GetRequiredService<LoggingOutboxPublisher>());
-            return;
-        }
+        if (options.Enabled)
+            services.AddSingleton<IOutboxPublisher, RabbitOutboxPublisher>();
+        else
+            services.AddSingleton<IOutboxPublisher>(sp => sp.GetRequiredService<LoggingOutboxPublisher>());
 
-        services.AddSingleton(connection);
-        services.AddSingleton(new RabbitRuntimeStatus("up"));
-        services.AddSingleton<IOutboxPublisher>(sp => new RabbitOutboxPublisher(
-            sp.GetRequiredService<IConnection>(),
-            sp.GetRequiredService<ILogger<RabbitOutboxPublisher>>(),
-            sp.GetRequiredService<LoggingOutboxPublisher>()));
+        // Consumers in this host (the ledger owner). Each handler = one queue with retry + dead-letter queues.
+        services.AddScoped(typeof(InboxProcessor<>));
+        services.AddScoped<CashbackOnCaptureHandler>();
+        services.AddSingleton(new MessageHandlerRegistry().Add<CashbackOnCaptureHandler>());
+        services.AddSingleton<RabbitConsumerService>();
+        services.AddHostedService(sp => sp.GetRequiredService<RabbitConsumerService>());
     }
 }

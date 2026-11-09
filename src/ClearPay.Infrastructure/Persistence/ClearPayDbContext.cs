@@ -47,5 +47,6 @@ public sealed class ClearPayDbContext : DbContext
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(ClearPayDbContext).Assembly,
             type => type.Namespace == "ClearPay.Infrastructure.Persistence.Configurations");
+        Messaging.InboxModel.Apply(modelBuilder);
     }
 }

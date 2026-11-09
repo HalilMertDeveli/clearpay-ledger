@@ -3,7 +3,11 @@ using Microsoft.Extensions.Logging;
 
 namespace ClearPay.Infrastructure.Messaging;
 
-/// <summary>Fallback when RabbitMQ is off or down. Hangfire still marks outbox Sent after this call.</summary>
+/// <summary>
+/// Used only when RabbitMQ is switched off (empty <c>ConnectionStrings:RabbitMq</c>): the row is logged and
+/// marked Sent. When RabbitMQ is configured but down, <see cref="RabbitOutboxPublisher"/> throws instead,
+/// so no event is silently lost.
+/// </summary>
 public sealed class LoggingOutboxPublisher : IOutboxPublisher
 {
     private readonly ILogger<LoggingOutboxPublisher> _logger;
@@ -13,11 +17,12 @@ public sealed class LoggingOutboxPublisher : IOutboxPublisher
         _logger = logger;
     }
 
-    public Task PublishAsync(string type, string payload, Guid correlationId, CancellationToken cancellationToken = default)
+    public Task PublishAsync(Guid messageId, string type, string payload, Guid correlationId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _logger.LogInformation(
-            "Outbox {Type} correlation {CorrelationId} payload length {Length}",
+            "Outbox {MessageId} {Type} correlation {CorrelationId} payload length {Length} (RabbitMQ off)",
+            messageId,
             type,
             correlationId,
             payload?.Length ?? 0);

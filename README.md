@@ -86,8 +86,9 @@ flowchart LR
 | `ClearPay.Web` | Composition root, controllers, Razor Pages, SignalR hub | Ledger arithmetic |
 | `mobile/clearpay` | Flutter client (JWT); no local balance | Any money logic |
 
-Redis and RabbitMQ are optional: without Redis the summary is read from SQL; without RabbitMQ the
-outbox publisher logs instead of publishing. SQL Server is the only source of truth.
+Redis and RabbitMQ are optional: without Redis the summary is read from SQL. With an empty
+`ConnectionStrings:RabbitMq` the outbox only logs events; with a configured broker that is down,
+events wait in the outbox and are published when it comes back. SQL Server is the only source of truth.
 
 ## Core Banking Concepts Demonstrated
 
@@ -159,9 +160,10 @@ key scope.
   notifications run after commit; RabbitMQ publishing happens later from the outbox. For
   top-ups, the simulated bank call happens **before** the ledger transaction and only a
   successful response is posted.
-- The outbox worker (Hangfire, every minute) marks rows `Sent` or `Failed`; failed rows can be
-  re-queued from the admin API. Delivery is at-least-once, so consumers should deduplicate by
-  correlation id.
+- The outbox worker (Hangfire, every minute) publishes Pending rows with publisher confirms; a failed
+  publish keeps the row Pending (attempt counter), after 5 failures it is `Failed` and can be
+  re-queued from the admin API. Delivery is at-least-once; consumers deduplicate on `MessageId`
+  with an inbox table (see Messaging).
 
 ## Card Payments: 3-D Secure (simulated)
 
@@ -288,6 +290,46 @@ warning with provider, reference and amounts, and the run publishes
 A date with a completed run is skipped by the nightly job (Hangfire may retry a failed run up to
 three times); a manual run always creates a new run.
 
+## Messaging: RabbitMQ Retry, Dead-Letter Queue, Inbox
+
+Outbox rows are published to the topic exchange `clearpay.events` (routing key = event type,
+`MessageId` = outbox row id, persistent, **publisher confirms**). If the broker is configured but
+unreachable or does not confirm, the publisher throws: the row stays `Pending` with `Attempts + 1`
+and the batch stops; after 5 failed attempts it becomes `Failed` and an admin can re-queue it.
+Only an empty `ConnectionStrings:RabbitMq` switches messaging off (rows are then logged).
+
+Every consumer gets its own queue set, declared idempotently by `RabbitTopology`:
+
+```text
+clearpay.events (topic) --clearpay.payment.captured--> clearpay.cashback ----> handler
+                                                          |        ^
+                       exception, attempt n < max  -------+        | TTL expires, dead-letters back
+                                                          v        |
+                                     clearpay.cashback.retry.1 (1 s) / .retry.2 (5 s) / .retry.3 (25 s)
+                       attempts exhausted, or poison (reject) ---> clearpay.cashback.dlq  (x-last-error, x-death)
+```
+
+- **Retry with backoff**: on an exception the consumer publishes a copy with `x-attempt` + 1 to the
+  next delay queue and acks the original; when the TTL expires the broker routes it back.
+  Defaults: 4 attempts, delays 1 s / 5 s / 25 s (`Messaging:MaxAttempts`, `Messaging:RetryDelaysMs`).
+- **Dead-letter queue**: after the last attempt the copy goes to `<queue>.dlq` with the last error in
+  `x-last-error`; a message that can never succeed (`PoisonMessageException`, missing `MessageId`)
+  is rejected without requeue and the broker dead-letters it there immediately.
+- **Consumer idempotency (inbox)**: `InboxProcessor` inserts `InboxMessage (Consumer, MessageId)`
+  and the handler's changes in **one transaction**, then the message is acked. A redelivery - outbox
+  re-publish, broker redelivery after a crash between commit and ack, or a retry - finds the row and
+  is acked without running the handler; two racing deliveries collide on the primary key and the
+  loser rolls back its side effects.
+- **The consumer that proves it posts money**: `CashbackOnCaptureHandler` (a demo promotion) credits
+  1 % of every captured card payment from the `clearpay-promotions` purse to the customer
+  (ledger kind `Cashback`). The RabbitMQ tests publish the same message twice, crash a consumer
+  after commit but before ack, fail the handler twice before it succeeds, and fail it forever:
+  the cashback is posted exactly once (or not at all for the dead-lettered message).
+- **Connection**: one long-lived connection with automatic recovery, opened lazily, so the app starts
+  without a broker; `/api/health` reports `up`, `down` or `off` live.
+- **Trace context**: `traceparent` / `tracestate` travel in the AMQP headers and the consumer starts its
+  span as a child of the publisher's (`ClearPay.Messaging` activity source).
+
 ## API Design
 
 JSON API, JWT bearer auth, OpenAPI document at `/swagger`. Errors use RFC 7807
@@ -338,7 +380,7 @@ Design decisions:
 | Identity | ASP.NET Core Identity, JWT bearer, optional Google/Apple/Firebase sign-in |
 | Validation | FluentValidation |
 | Background jobs | Hangfire (outbox processing, 3-D Secure expiry every minute, nightly reconciliation) |
-| Cache / messaging | Redis (StackExchange.Redis), RabbitMQ (RabbitMQ.Client), both optional |
+| Cache / messaging | Redis (StackExchange.Redis), RabbitMQ (RabbitMQ.Client: topic exchange, publisher confirms, TTL retry queues, DLQ, inbox), both optional |
 | Realtime | SignalR (refresh hints only, never balances) |
 | Docs | Swashbuckle / OpenAPI |
 | Mobile | Flutter (Dart 3), `http`, `flutter_secure_storage`, `signalr_netcore` |
@@ -351,8 +393,8 @@ Design decisions:
 
 | Suite | Command | Infrastructure | Result |
 |-------|---------|----------------|--------|
-| .NET, with SQL Server (2026-11-09) | `dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release` with `CLEARPAY_TEST_SQLSERVER` set | SQLite files (created by the tests) + SQL Server 2022 in Docker | **252 passed, 0 failed, 0 skipped** |
-| .NET, without SQL Server (2026-11-09) | same command, variable unset | SQLite only | 244 passed, 0 failed, 8 skipped (the SQL Server tests) |
+| .NET, full (2026-11-09) | `dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release` with `CLEARPAY_TEST_SQLSERVER` and `CLEARPAY_TEST_RABBITMQ` set | SQLite files (created by the tests) + SQL Server 2022 + RabbitMQ 3.13 in Docker | **266 passed, 0 failed, 0 skipped** |
+| .NET, fast (2026-11-09) | same command, variables unset | SQLite only | 253 passed, 0 failed, 13 skipped (8 SQL Server + 5 RabbitMQ tests) |
 | Flutter (2026-11-03) | `flutter analyze` and `flutter test` in `mobile/clearpay` | none (mocked HTTP) | no analyzer issues; **20 passed, 0 failed** |
 | NuGet vulnerabilities | `dotnet list <project> package --vulnerable --include-transitive` | none | no vulnerable packages |
 
@@ -377,6 +419,9 @@ What the money tests cover:
 | PSP adapters: all three authorize + capture; declines post nothing; void before capture; partial refunds capped; refund decline reversed; lost PSP response resumed without double posting; replayed keys | `CardPaymentServiceTests`, `CardPaymentApiTests` |
 | Ten parallel 30.00 refunds on a 100.00 payment: exactly three succeed; CHECK constraint rejects over-refund | `CardPaymentSqlServerTests` (SQL Server) |
 | Reconciliation: every mismatch kind from real fake-PSP payments and real settlement files; nightly job targets yesterday and skips a finished date; admin-only API | `ReconciliationEngineTests`, `ReconciliationServiceTests`, `ReconciliationAdminApiTests` |
+| Inbox: same message twice posts once; a failing handler rolls back its inbox row; poison payloads | `InboxProcessorTests` |
+| RabbitMQ: outbox re-publish and broker redelivery after a crash before ack post once; retries wait 200 / 400 ms then succeed once; exhausted retries and poison messages land in the DLQ | `RabbitMessagingTests` (RabbitMQ) |
+| Outbox: failed publish stays Pending until the attempt limit, batch stops, message id = row id | `OutboxProcessorTests`, `RabbitOutboxPublisherTests` |
 | Outbox worker, gateway timeout keeps the outbox row | `OutboxProcessorTests`, `FundingExecutorTests` |
 | Database CHECK constraint rejects zero-amount rows | `SqlServerLedgerTests` |
 | Architecture rules between layers | `ArchitectureTests` |
@@ -384,13 +429,15 @@ What the money tests cover:
 ### Run the tests
 
 ```bash
-# Fast suite: SQLite only, no Docker needed (SQL Server tests are reported as skipped)
+# Fast suite: SQLite only, no Docker needed (SQL Server and RabbitMQ tests are reported as skipped)
 dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release
 
-# Full suite: start a throw-away SQL Server and point the tests at it
+# Full suite: throw-away SQL Server and RabbitMQ containers
 docker run -d --name clearpay-test-sql -e ACCEPT_EULA=Y -e "MSSQL_SA_PASSWORD=<local-password>" \
   -p 127.0.0.1:14339:1433 mcr.microsoft.com/mssql/server:2022-latest
 export CLEARPAY_TEST_SQLSERVER="Server=127.0.0.1,14339;User Id=sa;Password=<local-password>;TrustServerCertificate=True;Encrypt=True"
+docker run -d --name clearpay-test-rabbit -p 127.0.0.1:25672:5672 rabbitmq:3.13-management-alpine
+export CLEARPAY_TEST_RABBITMQ="amqp://guest:guest@127.0.0.1:25672/"
 dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release
 
 # Flutter
@@ -406,9 +453,9 @@ EF migrations and drops it afterwards.
 
 `.github/workflows/ci.yml` runs on pushes to `main` and on pull requests:
 
-1. **.NET job** with a `mcr.microsoft.com/mssql/server:2022-latest` service container: restore,
-   build (Release), test with `CLEARPAY_TEST_SQLSERVER` set (so the concurrency and rollback tests
-   run against SQL Server), upload TRX results, then fail the job if
+1. **.NET job** with `mcr.microsoft.com/mssql/server:2022-latest` and `rabbitmq:3.13-management-alpine` service containers: restore,
+   build (Release), test with `CLEARPAY_TEST_SQLSERVER` and `CLEARPAY_TEST_RABBITMQ` set (so the concurrency, rollback and messaging tests
+   run against real servers), upload TRX results, then fail the job if
    `dotnet list package --vulnerable --include-transitive` reports anything.
 2. **Flutter job**: copy the Firebase options template, `flutter pub get`, `flutter analyze`,
    `flutter test`.

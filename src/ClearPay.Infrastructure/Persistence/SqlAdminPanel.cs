@@ -125,6 +125,8 @@ public sealed class SqlAdminPanel : IAdminPanel
         if (row is null)
             return false;
         row.Status = OutboxStatus.Pending;
+        row.Attempts = 0;
+        row.LastError = null;
         row.ProcessedAt = null;
         await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return true;
