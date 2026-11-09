@@ -38,6 +38,10 @@ public sealed class ClearPayDbContext : DbContext
     /// <summary>Fake PSPs' own journal ("sim" schema). Only the simulators write it.</summary>
     public DbSet<SimPspTransaction> SimPspTransactions => Set<SimPspTransaction>();
 
+    public DbSet<Domain.Reconciliation.ReconciliationRun> ReconciliationRuns => Set<Domain.Reconciliation.ReconciliationRun>();
+
+    public DbSet<Domain.Reconciliation.ReconciliationItem> ReconciliationItems => Set<Domain.Reconciliation.ReconciliationItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(

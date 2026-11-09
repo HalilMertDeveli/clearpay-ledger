@@ -10,6 +10,7 @@ using ClearPay.Infrastructure.Payments;
 using ClearPay.Infrastructure.Payments.Psp;
 using Microsoft.Extensions.Hosting;
 using ClearPay.Infrastructure.Persistence;
+using ClearPay.Infrastructure.Reconciliation;
 using ClearPay.Infrastructure.Realtime;
 using ClearPay.Infrastructure.Time;
 using Hangfire;
@@ -86,6 +87,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPspRouter, PspRouter>();
         services.AddScoped<ICardPaymentService, SqlCardPaymentService>();
 
+        services.AddSingleton<ISettlementFileSource, SimSettlementFileSource>();
+        services.AddScoped<ILedgerSettlementSource, SqlLedgerSettlementSource>();
+        services.AddScoped<IReconciliationService, SqlReconciliationService>();
+        services.AddScoped<ReconciliationHangfireJob>();
+
         services.AddScoped<RestBankGateway>();
         services.AddScoped<SoapBankGateway>();
         var strategy = configuration["BankGateway:Strategy"] ?? "REST";
@@ -160,6 +166,11 @@ public static class ServiceCollectionExtensions
                 "clearpay-3ds-expiry",
                 job => job.Run(),
                 Cron.Minutely);
+
+            manager.AddOrUpdate<ReconciliationHangfireJob>(
+                "clearpay-reconciliation-nightly",
+                job => job.Run(),
+                Cron.Daily(2, 30));
         }
         catch (Exception)
         {

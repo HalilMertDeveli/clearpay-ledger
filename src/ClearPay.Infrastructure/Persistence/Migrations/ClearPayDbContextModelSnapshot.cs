@@ -530,6 +530,103 @@ namespace ClearPay.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ClearPay.Domain.Reconciliation.ReconciliationItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<decimal?>("LedgerAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("OperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("SettlementAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RunId", "Kind")
+                        .HasDatabaseName("IX_ReconciliationItem_RunId_Kind");
+
+                    b.ToTable("ReconciliationItem", (string)null);
+                });
+
+            modelBuilder.Entity("ClearPay.Domain.Reconciliation.ReconciliationRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<decimal>("LedgerTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("MatchedCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MismatchCount")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("SettlementTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessDate", "Status")
+                        .HasDatabaseName("IX_ReconciliationRun_BusinessDate_Status");
+
+                    b.ToTable("ReconciliationRun", (string)null);
+                });
+
             modelBuilder.Entity("ClearPay.Domain.Ledger.LedgerEntry", b =>
                 {
                     b.HasOne("ClearPay.Domain.Ledger.Transfer", null)
@@ -567,6 +664,15 @@ namespace ClearPay.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("PaymentId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ClearPay.Domain.Reconciliation.ReconciliationItem", b =>
+                {
+                    b.HasOne("ClearPay.Domain.Reconciliation.ReconciliationRun", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 #pragma warning restore 612, 618

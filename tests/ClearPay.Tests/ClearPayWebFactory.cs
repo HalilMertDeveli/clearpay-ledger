@@ -25,6 +25,7 @@ public sealed class ClearPayWebFactory : WebApplicationFactory<Program>
         builder.UseSetting("Jwt:SigningKey", TestSigningKey);
         builder.UseSetting("Seed:AdminPassword", SeedAdminPassword);
         builder.UseSetting("Hangfire:Enabled", "false");
+        builder.UseSetting("Reconciliation:SettlementDirectory", Path.Combine(Path.GetTempPath(), $"clearpay-settlements-{Guid.NewGuid():N}"));
         builder.UseSetting("Firebase:ProjectId", "clearpay-test");
         builder.UseSetting("Firebase:AllowTestTokens", "true");
     }
