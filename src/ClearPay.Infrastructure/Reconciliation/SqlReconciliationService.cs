@@ -20,20 +20,9 @@ public sealed class SqlLedgerSettlementSource : ILedgerSettlementSource
         _db = db;
     }
 
-    public async Task<IReadOnlyList<LedgerSideRecord>> LoadAsync(DateOnly businessDate, CancellationToken cancellationToken = default)
-    {
-        var ops = await _db.PaymentOperations.AsNoTracking()
-            .Where(o => (o.Type == PaymentOperationType.Capture || o.Type == PaymentOperationType.Refund)
-                        && o.Status != PaymentOperationStatus.Failed)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-        // Date filter client-side so the same code runs on SQLite (tests); SQL Server uses the index in step 5.
-        return ops
-            .Where(o => DateOnly.FromDateTime(o.CreatedAt.UtcDateTime) == businessDate)
-            .Select(o => new LedgerSideRecord(o.Id, o.Provider, o.Type.ToString(), o.Status.ToString(),
-                o.ProviderReference, o.CorrelationId, o.Amount))
-            .ToList();
-    }
+    /// <summary>SQL Server: <c>dbo.usp_PaymentSettlementCandidates</c> (index seek on CreatedAt); SQLite: LINQ.</summary>
+    public Task<IReadOnlyList<LedgerSideRecord>> LoadAsync(DateOnly businessDate, CancellationToken cancellationToken = default) =>
+        LedgerSql.SettlementCandidatesAsync(_db, businessDate, cancellationToken);
 }
 
 /// <summary>

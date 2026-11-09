@@ -122,7 +122,7 @@ LedgerEntry  WalletId  Amount   PairId  CorrelationId  Kind
 - `LedgerPair.Create` is the only constructor of entries used by the executors. It rejects
   non-positive amounts and identical wallets and calls `EnsureBalanced` on the result.
 - The database adds its own guard: `CK_LedgerEntry_Amount_NotZero`, `decimal(18,2)` amounts,
-  restrict-delete foreign keys, and an index on `(WalletId, CreatedAt)`.
+  restrict-delete foreign keys, and a covering index on `(WalletId, CreatedAt) INCLUDE (Amount, Kind, CorrelationId)`.
 - Balance = `SUM(Amount) WHERE WalletId = @wallet`. Wallet summaries may be cached in Redis but
   are invalidated after every commit and never written back to SQL.
 
@@ -330,6 +330,44 @@ clearpay.events (topic) --clearpay.payment.captured--> clearpay.cashback ----> h
 - **Trace context**: `traceparent` / `tracestate` travel in the AMQP headers and the consumer starts its
   span as a child of the publisher's (`ClearPay.Messaging` activity source).
 
+## T-SQL: Stored Procedures, Covering Indexes, Measured Plans
+
+The hot read paths used to be EF queries that pulled every ledger row of a wallet to the app and
+summed it in C#. On SQL Server they now call stored procedures that answer from covering indexes
+(SQLite in the fast tests keeps the equivalent LINQ; `LedgerSql` picks one).
+
+| Procedure | Used by | Index it seeks |
+|-----------|---------|----------------|
+| `dbo.usp_LedgerWalletBalance @WalletId` | overdraft check in transfer, withdraw and card refund (runs **inside** the caller's Serializable transaction) | `IX_LedgerEntry_WalletId_CreatedAt (WalletId, CreatedAt) INCLUDE (Amount, Kind, CorrelationId)` |
+| `dbo.usp_LedgerWalletSummary @WalletId, @MonthStart` | `/api/wallet` and the home page: balance, month in/out, last 5 movements in one round trip | same index (aggregate + backward `TOP (5)` range scan, no sort) |
+| `dbo.usp_PaymentSettlementCandidates @From, @To` | nightly reconciliation (one day of captures / refunds) | `IX_PaymentOperation_CreatedAt_Type (CreatedAt, Type) INCLUDE (Status, Provider, ProviderReference, CorrelationId, Amount)` |
+
+The procedures live in `src/ClearPay.Infrastructure/Persistence/Sql/LedgerProcedures.sql` and are
+created by the EF migration `AddLedgerProceduresAndCoveringIndexes`. A narrower covering index also
+narrows the key-range locks the Serializable overdraft check takes.
+
+**Before / after, from actual execution plans** (`scripts/sql/Measure-LedgerPlans.ps1`: fresh
+database, all migrations, synthetic data - 1,000,000 ledger rows with 100,000 on the measured
+wallet, 125,000 payment operations; SQL Server 2022 in Docker; warm cache; median of 5 runs;
+reads / CPU / elapsed taken from `RunTimeCountersPerThread` and `QueryTimeStats` in the plan XML).
+"Before" is the query shape EF generated before this change, on the original index:
+
+| Query | Before: rows to app / logical reads / elapsed | After: rows / logical reads / elapsed | Plan change |
+|-------|-----------------------------------------------|----------------------------------------|-------------|
+| Wallet balance (overdraft check) | 100,000 / 288,087 / 162 ms | 1 / 963 / 10 ms | Index Seek + 100,000 Key Lookups (clustered seeks) -> covering Index Seek + Stream Aggregate |
+| Wallet summary | 100,000 / 288,087 / 203 ms | 6 / 966 / 22 ms | same lookups for every column -> one covering seek + `TOP (5)` on the index order |
+| Reconciliation, one day | 122,976 / 4,179 / 87 ms | 2,035 / 42 / 1 ms | Clustered Index Scan (date filtered in C#) -> range Index Seek on `CreatedAt` |
+
+"Before" elapsed times are server-side only; the 100,000-row result sets also had to cross the
+network and be materialised by EF, which the "after" versions avoid. The full table and the
+`.sqlplan` files (open in SSMS / Azure Data Studio) are in [`docs/sql`](docs/sql/plan-results.md).
+Reproduce with:
+
+```powershell
+$env:CLEARPAY_BENCH_SA_PASSWORD = '<sa password of a throw-away local container>'
+./scripts/sql/Measure-LedgerPlans.ps1 -Server '127.0.0.1,14339'
+```
+
 ## API Design
 
 JSON API, JWT bearer auth, OpenAPI document at `/swagger`. Errors use RFC 7807
@@ -393,8 +431,8 @@ Design decisions:
 
 | Suite | Command | Infrastructure | Result |
 |-------|---------|----------------|--------|
-| .NET, full (2026-11-09) | `dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release` with `CLEARPAY_TEST_SQLSERVER` and `CLEARPAY_TEST_RABBITMQ` set | SQLite files (created by the tests) + SQL Server 2022 + RabbitMQ 3.13 in Docker | **266 passed, 0 failed, 0 skipped** |
-| .NET, fast (2026-11-09) | same command, variables unset | SQLite only | 253 passed, 0 failed, 13 skipped (8 SQL Server + 5 RabbitMQ tests) |
+| .NET, full (2026-11-09) | `dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release` with `CLEARPAY_TEST_SQLSERVER` and `CLEARPAY_TEST_RABBITMQ` set | SQLite files (created by the tests) + SQL Server 2022 + RabbitMQ 3.13 in Docker | **270 passed, 0 failed, 0 skipped** |
+| .NET, fast (2026-11-09) | same command, variables unset | SQLite only | 253 passed, 0 failed, 17 skipped (12 SQL Server + 5 RabbitMQ tests) |
 | Flutter (2026-11-03) | `flutter analyze` and `flutter test` in `mobile/clearpay` | none (mocked HTTP) | no analyzer issues; **20 passed, 0 failed** |
 | NuGet vulnerabilities | `dotnet list <project> package --vulnerable --include-transitive` | none | no vulnerable packages |
 
@@ -422,6 +460,7 @@ What the money tests cover:
 | Inbox: same message twice posts once; a failing handler rolls back its inbox row; poison payloads | `InboxProcessorTests` |
 | RabbitMQ: outbox re-publish and broker redelivery after a crash before ack post once; retries wait 200 / 400 ms then succeed once; exhausted retries and poison messages land in the DLQ | `RabbitMessagingTests` (RabbitMQ) |
 | Outbox: failed publish stays Pending until the attempt limit, batch stops, message id = row id | `OutboxProcessorTests`, `RabbitOutboxPublisherTests` |
+| Stored procedures return the same balance / summary / settlement rows as the LINQ they replace, join the caller's transaction, and the covering indexes exist after migration | `LedgerProcedureSqlServerTests` (SQL Server) |
 | Outbox worker, gateway timeout keeps the outbox row | `OutboxProcessorTests`, `FundingExecutorTests` |
 | Database CHECK constraint rejects zero-amount rows | `SqlServerLedgerTests` |
 | Architecture rules between layers | `ArchitectureTests` |
@@ -532,7 +571,8 @@ Both screenshots show the local Development seed account on a `.test` domain; no
 - Portfolio demo. Not a licensed financial product; not audited; no real bank or card network
   integration (the gateway is simulated).
 - Single currency (TRY), no FX, fees, interest, statements, limits or scheduled payments.
-- Balance is computed by summing all of a wallet's entries on each check. A production ledger
+- Balance is still the sum of all of a wallet's entries on each check (now one covering index seek, about 1,000
+  logical reads for a 100,000-row wallet - see the T-SQL section). A production ledger
   would add balance snapshots or a locked running balance per account.
 - Serializable isolation keeps the overdraft check correct but converts contention into deadlock
   retries (503). Row-level locking of the sender's account would scale better.

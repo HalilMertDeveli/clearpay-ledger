@@ -125,12 +125,7 @@ public sealed class SqlTransferExecutor : ITransferExecutor
                 return TransferOutcome.Fail(TransferResultKind.FrozenSender);
             }
 
-            var senderAmounts = await _db.LedgerEntries
-                .Where(e => e.WalletId == sender.Id)
-                .Select(e => e.Amount)
-                .ToListAsync(cancellationToken)
-                .ConfigureAwait(false);
-            var senderNet = senderAmounts.Sum();
+            var senderNet = await LedgerSql.WalletNetAsync(_db, sender.Id, cancellationToken).ConfigureAwait(false);
             if (LedgerPair.WouldGoNegative(senderNet, decimal.Negate(command.Amount)))
             {
                 await tx.RollbackAsync(cancellationToken).ConfigureAwait(false);

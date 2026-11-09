@@ -22,8 +22,10 @@ internal sealed class LedgerEntryConfiguration : IEntityTypeConfiguration<Ledger
         builder.Ignore(e => e.IsDebit);
         builder.Ignore(e => e.IsCredit);
 
+        // Covering: balance (SUM Amount) and the summary/movement reads never touch the clustered index.
         builder.HasIndex(e => new { e.WalletId, e.CreatedAt })
-            .HasDatabaseName(LedgerSchema.LedgerEntryWalletCreated);
+            .HasDatabaseName(LedgerSchema.LedgerEntryWalletCreated)
+            .IncludeProperties(e => new { e.Amount, e.Kind, e.CorrelationId });
 
         builder.HasOne<Wallet>()
             .WithMany()

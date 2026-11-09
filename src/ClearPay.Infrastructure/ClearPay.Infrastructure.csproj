@@ -5,6 +5,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Persistence\Sql\*.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.17" />
     <!-- Pins for patched versions of vulnerable transitive dependencies (see the vulnerable-package scan in CI). -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

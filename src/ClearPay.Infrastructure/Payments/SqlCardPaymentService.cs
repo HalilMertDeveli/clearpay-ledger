@@ -230,9 +230,8 @@ public sealed class SqlCardPaymentService : ICardPaymentService
 
             var customer = await WalletOfAsync(payment.UserId, cancellationToken).ConfigureAwait(false);
             var treasury = await WalletOfAsync(Treasury.UserId, cancellationToken).ConfigureAwait(false);
-            var net = await _db.LedgerEntries.Where(e => e.WalletId == customer.Id).Select(e => e.Amount)
-                .ToListAsync(cancellationToken).ConfigureAwait(false);
-            if (LedgerPair.WouldGoNegative(net.Sum(), decimal.Negate(amount)))
+            var net = await LedgerSql.WalletNetAsync(_db, customer.Id, cancellationToken).ConfigureAwait(false);
+            if (LedgerPair.WouldGoNegative(net, decimal.Negate(amount)))
                 return PaymentResult.Fail(PaymentResultKind.InsufficientFunds, await ViewAsync(payment.Id, cancellationToken).ConfigureAwait(false));
 
             payment.ReserveRefund(amount, now);

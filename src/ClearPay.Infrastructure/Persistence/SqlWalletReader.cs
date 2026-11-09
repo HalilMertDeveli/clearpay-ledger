@@ -37,30 +37,19 @@ public sealed class SqlWalletReader : IWalletReader
         if (wallet is null)
             wallet = await EnsureWalletAsync(userId, cancellationToken).ConfigureAwait(false);
 
-        var entries = await _db.LedgerEntries
-            .AsNoTracking()
-            .Where(e => e.WalletId == wallet.Id)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-
         var now = _clock.UtcNow;
         var monthStart = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, TimeSpan.Zero);
-        var inMonth = entries.Where(e => e.CreatedAt >= monthStart).ToList();
-
-        var last = entries
-            .OrderByDescending(e => e.CreatedAt)
-            .Take(5)
-            .Select(e => new WalletMovement(e.CreatedAt, e.Kind.ToString(), e.Amount, e.CorrelationId))
-            .ToList();
+        var summary = await LedgerSql.WalletSummaryAsync(_db, wallet.Id, monthStart, cancellationToken)
+            .ConfigureAwait(false);
 
         return new WalletSummary(
             WalletId: wallet.Id,
             UserId: userId,
-            Balance: LedgerPair.NetOf(entries, wallet.Id),
-            MonthOutgoing: decimal.Negate(inMonth.Where(e => e.Amount < 0m).Sum(e => e.Amount)),
-            MonthIncoming: inMonth.Where(e => e.Amount > 0m).Sum(e => e.Amount),
+            Balance: summary.Balance,
+            MonthOutgoing: summary.MonthOutgoing,
+            MonthIncoming: summary.MonthIncoming,
             IsFrozen: wallet.IsFrozen,
-            LastMovements: last);
+            LastMovements: summary.Last);
     }
 
     private async Task<bool> TryConnectAsync(CancellationToken cancellationToken)

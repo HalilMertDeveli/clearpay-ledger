@@ -66,12 +66,8 @@ public sealed class SqlFundingExecutor : IFundingExecutor
 
         if (command.Operation == BankOperation.Withdraw)
         {
-            var amounts = await _db.LedgerEntries
-                .Where(e => e.WalletId == customer.Id)
-                .Select(e => e.Amount)
-                .ToListAsync(cancellationToken)
-                .ConfigureAwait(false);
-            if (LedgerPair.WouldGoNegative(amounts.Sum(), decimal.Negate(command.Amount)))
+            var net = await LedgerSql.WalletNetAsync(_db, customer.Id, cancellationToken).ConfigureAwait(false);
+            if (LedgerPair.WouldGoNegative(net, decimal.Negate(command.Amount)))
                 return FundingOutcome.Fail(FundingResultKind.InsufficientFunds);
         }
 
@@ -120,12 +116,8 @@ public sealed class SqlFundingExecutor : IFundingExecutor
                     return FundingOutcome.Fail(FundingResultKind.Frozen);
                 }
 
-                var live = await _db.LedgerEntries
-                    .Where(e => e.WalletId == customer.Id)
-                    .Select(e => e.Amount)
-                    .ToListAsync(cancellationToken)
-                    .ConfigureAwait(false);
-                if (LedgerPair.WouldGoNegative(live.Sum(), decimal.Negate(command.Amount)))
+                var live = await LedgerSql.WalletNetAsync(_db, customer.Id, cancellationToken).ConfigureAwait(false);
+                if (LedgerPair.WouldGoNegative(live, decimal.Negate(command.Amount)))
                 {
                     await tx.RollbackAsync(cancellationToken).ConfigureAwait(false);
                     return FundingOutcome.Fail(FundingResultKind.InsufficientFunds);
