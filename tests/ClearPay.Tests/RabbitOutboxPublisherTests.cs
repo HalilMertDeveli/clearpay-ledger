@@ -1,3 +1,4 @@
+using ClearPay.Messaging;
 using ClearPay.Infrastructure.Messaging;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -11,7 +12,7 @@ public sealed class RabbitOutboxPublisherTests
     {
         var options = new RabbitOptions { Uri = "amqp://guest:guest@127.0.0.1:1/" };
         using var connections = new RabbitConnectionProvider(options, NullLogger<RabbitConnectionProvider>.Instance);
-        var sut = new RabbitOutboxPublisher(connections, options, NullLogger<RabbitOutboxPublisher>.Instance);
+        var sut = new RabbitOutboxPublisher(new RabbitEventPublisher(connections, options, NullLogger<RabbitEventPublisher>.Instance));
 
         var act = async () => await sut.PublishAsync(Guid.NewGuid(), "clearpay.transfer.completed", "{}", Guid.NewGuid());
 

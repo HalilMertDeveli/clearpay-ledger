@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace ClearPay.Infrastructure.Messaging;
+namespace ClearPay.Messaging;
 
 /// <summary>A message as the consumer sees it, independent of RabbitMQ types.</summary>
 public sealed record InboundMessage(

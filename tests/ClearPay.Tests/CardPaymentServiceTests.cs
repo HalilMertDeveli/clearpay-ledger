@@ -34,8 +34,11 @@ public sealed class CardPaymentServiceTests : IDisposable
         await using var db = _host.NewContext();
         (await db.LedgerEntries.Select(e => e.Kind).Distinct().ToListAsync())
             .Should().Equal(LedgerEntryKind.CardPayment);
-        (await db.OutboxMessages.Select(m => m.Type).ToListAsync())
+        var types = await db.OutboxMessages.Select(m => m.Type).ToListAsync();
+        types.Where(t => t != "clearpay.payment.operation.recorded")
             .Should().BeEquivalentTo(new[] { "clearpay.payment.authorized", "clearpay.payment.captured" });
+        types.Count(t => t == "clearpay.payment.operation.recorded")
+            .Should().Be(4, "authorize and capture are each recorded when sent (Pending) and when answered");
         (await db.SimPspTransactions.Where(t => t.Provider == provider).Select(t => t.Type).ToListAsync())
             .Should().BeEquivalentTo(new[] { PaymentOperationType.Authorize, PaymentOperationType.Capture });
     }

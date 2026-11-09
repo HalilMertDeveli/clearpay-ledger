@@ -1,9 +1,7 @@
 using System.Data;
 using System.Data.Common;
-using ClearPay.Application.Reconciliation;
 using ClearPay.Application.Wallets;
 using ClearPay.Domain.Ledger;
-using ClearPay.Domain.Payments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -19,7 +17,6 @@ public static class LedgerSql
 {
     public const string BalanceProcedure = "dbo.usp_LedgerWalletBalance";
     public const string SummaryProcedure = "dbo.usp_LedgerWalletSummary";
-    public const string SettlementProcedure = "dbo.usp_PaymentSettlementCandidates";
 
     /// <summary>Balance = SUM(Amount) of the wallet's entries.</summary>
     public static async Task<decimal> WalletNetAsync(ClearPayDbContext db, Guid walletId, CancellationToken cancellationToken)
@@ -81,44 +78,6 @@ public static class LedgerSql
         }
 
         return (balance, incoming, outgoing, last);
-    }
-
-    /// <summary>Captures and refunds sent to a PSP on one UTC business date that did not fail.</summary>
-    public static async Task<IReadOnlyList<LedgerSideRecord>> SettlementCandidatesAsync(
-        ClearPayDbContext db, DateOnly businessDate, CancellationToken cancellationToken)
-    {
-        var from = new DateTimeOffset(businessDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-        var to = from.AddDays(1);
-        if (!db.Database.IsSqlServer())
-        {
-            var ops = await db.PaymentOperations.AsNoTracking()
-                .Where(o => (o.Type == PaymentOperationType.Capture || o.Type == PaymentOperationType.Refund)
-                            && o.Status != PaymentOperationStatus.Failed)
-                .ToListAsync(cancellationToken).ConfigureAwait(false);
-            return ops.Where(o => o.CreatedAt >= from && o.CreatedAt < to)
-                .Select(o => new LedgerSideRecord(o.Id, o.Provider, o.Type.ToString(), o.Status.ToString(),
-                    o.ProviderReference, o.CorrelationId, o.Amount))
-                .ToList();
-        }
-
-        await using var command = await CommandAsync(db, SettlementProcedure, cancellationToken).ConfigureAwait(false);
-        AddParameter(command, "@From", from, DbType.DateTimeOffset);
-        AddParameter(command, "@To", to, DbType.DateTimeOffset);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        var result = new List<LedgerSideRecord>();
-        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            result.Add(new LedgerSideRecord(
-                reader.GetGuid(0),
-                reader.GetString(1),
-                ((PaymentOperationType)reader.GetInt32(2)).ToString(),
-                ((PaymentOperationStatus)reader.GetInt32(3)).ToString(),
-                reader.IsDBNull(4) ? null : reader.GetString(4),
-                reader.GetGuid(5),
-                reader.GetDecimal(6)));
-        }
-
-        return result;
     }
 
     private static async Task<DbCommand> CommandAsync(ClearPayDbContext db, string procedure, CancellationToken cancellationToken)

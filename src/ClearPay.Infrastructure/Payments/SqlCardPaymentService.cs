@@ -108,6 +108,7 @@ public sealed class SqlCardPaymentService : ICardPaymentService
 
             _db.CardPayments.Add(payment);
             _db.PaymentOperations.Add(authOp);
+            AddOperationEvent(authOp, payment.UserId);
             await _idempotency.ReserveAsync(key, "payment", hash, payment.Id, cancellationToken).ConfigureAwait(false);
             if (!await TrySaveAsync(cancellationToken).ConfigureAwait(false))
             {
@@ -171,6 +172,7 @@ public sealed class SqlCardPaymentService : ICardPaymentService
         var now = _clock.UtcNow;
         var op = NewOperation(payment, PaymentOperationType.Void, payment.Amount, $"{payment.Id:N}-void", now);
         _db.PaymentOperations.Add(op);
+        AddOperationEvent(op, payment.UserId);
         await _idempotency.ReserveAsync(key, "void", hash, payment.Id, cancellationToken).ConfigureAwait(false);
         if (!await TrySaveAsync(cancellationToken).ConfigureAwait(false))
             return PaymentResult.Fail(PaymentResultKind.Replay, await ViewAsync(payment.Id, cancellationToken).ConfigureAwait(false));
@@ -238,6 +240,7 @@ public sealed class SqlCardPaymentService : ICardPaymentService
             op = NewOperation(payment, PaymentOperationType.Refund, amount, string.Empty, now);
             op.ProviderIdempotencyKey = $"{op.Id:N}-refund";
             _db.PaymentOperations.Add(op);
+            AddOperationEvent(op, payment.UserId);
             var (debit, credit) = LedgerPair.Create(customer.Id, treasury.Id, amount, op.CorrelationId,
                 LedgerEntryKind.Refund, description: $"Card refund {payment.Provider} ****{payment.CardLast4}", at: now);
             _db.LedgerEntries.AddRange(debit, credit);
@@ -328,6 +331,7 @@ public sealed class SqlCardPaymentService : ICardPaymentService
             op = NewOperation(payment, PaymentOperationType.Capture, payment.Amount, providerKey, _clock.UtcNow);
             op.CorrelationId = payment.CorrelationId;
             _db.PaymentOperations.Add(op);
+            AddOperationEvent(op, payment.UserId);
             await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             _db.ChangeTracker.Clear();
         }
@@ -381,6 +385,7 @@ public sealed class SqlCardPaymentService : ICardPaymentService
                 op.Status = answer.Outcome == PspOutcome.Approved ? PaymentOperationStatus.Succeeded : PaymentOperationStatus.Failed;
                 op.ProviderReference = answer.Reference;
                 op.UpdatedAt = now;
+                AddOperationEvent(op, payment.UserId);
                 await apply(payment, now).ConfigureAwait(false);
                 await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             }
@@ -412,6 +417,7 @@ public sealed class SqlCardPaymentService : ICardPaymentService
         payment.ReleaseRefund(amount, now);
         op.Status = PaymentOperationStatus.Failed;
         op.UpdatedAt = now;
+        AddOperationEvent(op, payment.UserId);
         var customer = await WalletOfAsync(payment.UserId, cancellationToken).ConfigureAwait(false);
         var treasury = await WalletOfAsync(Treasury.UserId, cancellationToken).ConfigureAwait(false);
         var (debit, credit) = LedgerPair.Create(treasury.Id, customer.Id, amount, op.CorrelationId,
@@ -536,6 +542,34 @@ public sealed class SqlCardPaymentService : ICardPaymentService
             CreatedAt = now
         });
 
+    /// <summary>
+    /// Snapshot of one PSP operation (created as Pending, then Succeeded/Failed). The Operations service
+    /// builds its reconciliation projection from these events; it never reads the ledger database.
+    /// </summary>
+    private void AddOperationEvent(PaymentOperation op, string userId) =>
+        _db.OutboxMessages.Add(new OutboxMessage
+        {
+            Id = Guid.NewGuid(),
+            Type = "clearpay.payment.operation.recorded",
+            Payload = JsonSerializer.Serialize(new
+            {
+                operationId = op.Id,
+                paymentId = op.PaymentId,
+                userId,
+                type = op.Type.ToString(),
+                status = op.Status.ToString(),
+                provider = op.Provider,
+                providerReference = op.ProviderReference,
+                merchantReference = op.CorrelationId,
+                amount = op.Amount,
+                createdAt = op.CreatedAt,
+                updatedAt = op.UpdatedAt
+            }),
+            CorrelationId = op.CorrelationId,
+            OccurredAt = op.UpdatedAt,
+            Status = OutboxStatus.Pending
+        });
+
     private void AddEvent(CardPayment p, string type, decimal amount, string? providerReference, DateTimeOffset now) =>
         _db.OutboxMessages.Add(new OutboxMessage
         {
@@ -549,6 +583,7 @@ public sealed class SqlCardPaymentService : ICardPaymentService
                 provider = p.Provider,
                 providerReference,
                 amount,
+                cardLast4 = p.CardLast4,
                 capturedAmount = p.CapturedAmount,
                 refundedAmount = p.RefundedAmount,
                 status = p.Status.ToString(),

@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
-namespace ClearPay.Infrastructure.Messaging;
+namespace ClearPay.Messaging;
 
 /// <summary>Which handler types this process consumes (each gets its own queue and channel).</summary>
 public sealed class MessageHandlerRegistry

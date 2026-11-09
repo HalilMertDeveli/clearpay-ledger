@@ -1,3 +1,4 @@
+using ClearPay.Messaging;
 using ClearPay.Application.Ports;
 using ClearPay.Infrastructure.Messaging;
 using ClearPay.Infrastructure.Messaging.Handlers;
@@ -54,6 +55,7 @@ internal sealed class RabbitTestHost : IAsyncDisposable
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().AddInMemoryCollection().Build());
         services.AddSingleton(Options);
         services.AddSingleton<RabbitConnectionProvider>();
+        services.AddSingleton<RabbitEventPublisher>();
         services.AddSingleton<RabbitOutboxPublisher>();
         services.AddScoped(typeof(InboxProcessor<>));
         services.AddScoped<CashbackOnCaptureHandler>();

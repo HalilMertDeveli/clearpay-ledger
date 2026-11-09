@@ -49,3 +49,10 @@ public interface IReconciliationService
     Task<(ReconciliationRunSummary Run, IReadOnlyList<ReconciliationItemView> Items)?> GetAsync(
         Guid runId, CancellationToken cancellationToken = default);
 }
+
+/// <summary>The PSP side of the end-of-day process (simulated): drops one settlement file per provider.</summary>
+public interface IPspSettlementFileWriter
+{
+    /// <summary>Returns the paths written.</summary>
+    Task<IReadOnlyList<string>> WriteAsync(DateOnly businessDate, CancellationToken cancellationToken = default);
+}

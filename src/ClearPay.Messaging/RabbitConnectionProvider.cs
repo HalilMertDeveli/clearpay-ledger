@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 
-namespace ClearPay.Infrastructure.Messaging;
+namespace ClearPay.Messaging;
 
 /// <summary>
 /// One long-lived connection with automatic recovery. Connects lazily, so the app starts even when the

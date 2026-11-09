@@ -1,6 +1,8 @@
 -- ClearPay ledger stored procedures (SQL Server). Created by the EF migration
 -- AddLedgerProceduresAndCoveringIndexes, which runs this embedded file batch by batch (split on GO).
 -- Every procedure is answered from a covering nonclustered index (no key lookups).
+-- usp_PaymentSettlementCandidates is dropped again by MoveReconciliationToOperationsService: reconciliation
+-- moved to the Operations service, which keeps the same procedure shape on its own projection (ops schema).
 
 CREATE OR ALTER PROCEDURE dbo.usp_LedgerWalletBalance
     @WalletId uniqueidentifier

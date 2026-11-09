@@ -1,3 +1,4 @@
+using ClearPay.Messaging;
 using ClearPay.Application.Ports;
 using ClearPay.Infrastructure.Banking;
 using ClearPay.Infrastructure.Caching;
@@ -11,7 +12,6 @@ using ClearPay.Infrastructure.Payments;
 using ClearPay.Infrastructure.Payments.Psp;
 using Microsoft.Extensions.Hosting;
 using ClearPay.Infrastructure.Persistence;
-using ClearPay.Infrastructure.Reconciliation;
 using ClearPay.Infrastructure.Realtime;
 using ClearPay.Infrastructure.Time;
 using Hangfire;
@@ -88,10 +88,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPspRouter, PspRouter>();
         services.AddScoped<ICardPaymentService, SqlCardPaymentService>();
 
-        services.AddSingleton<ISettlementFileSource, SimSettlementFileSource>();
-        services.AddScoped<ILedgerSettlementSource, SqlLedgerSettlementSource>();
-        services.AddScoped<IReconciliationService, SqlReconciliationService>();
-        services.AddScoped<ReconciliationHangfireJob>();
+        services.AddSingleton<IPspSettlementFileWriter, SimSettlementFileWriter>();
+        services.AddScoped<PspSettlementFilesHangfireJob>();
 
         services.AddScoped<RestBankGateway>();
         services.AddScoped<SoapBankGateway>();
@@ -168,10 +166,10 @@ public static class ServiceCollectionExtensions
                 job => job.Run(),
                 Cron.Minutely);
 
-            manager.AddOrUpdate<ReconciliationHangfireJob>(
-                "clearpay-reconciliation-nightly",
+            manager.AddOrUpdate<PspSettlementFilesHangfireJob>(
+                "clearpay-psp-settlement-files",
                 job => job.Run(),
-                Cron.Daily(2, 30));
+                Cron.Daily(1, 0));
         }
         catch (Exception)
         {
@@ -199,6 +197,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(options);
         services.AddSingleton<RabbitConnectionProvider>();
         services.AddSingleton<RabbitRuntimeStatus>();
+        services.AddSingleton<RabbitEventPublisher>();
         services.AddSingleton<LoggingOutboxPublisher>();
         if (options.Enabled)
             services.AddSingleton<IOutboxPublisher, RabbitOutboxPublisher>();

@@ -1,6 +1,4 @@
-using ClearPay.Application.Payments;
 using ClearPay.Domain.Ledger;
-using ClearPay.Domain.Payments;
 using ClearPay.Infrastructure.Persistence;
 using ClearPay.Tests.Support;
 using FluentAssertions;
@@ -69,38 +67,6 @@ public sealed class LedgerProcedureSqlServerTests : IClassFixture<SqlServerFixtu
     }
 
     [SqlServerFact]
-    public async Task Settlement_procedure_returns_one_day_of_non_failed_captures_and_refunds()
-    {
-        await using var db = _fixture.CreateContext();
-        var day = new DateOnly(2026, 11, 8);
-        var midnight = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-        var payment = new CardPayment
-        {
-            Id = Guid.NewGuid(), UserId = "settle", ThreeDsSessionId = Guid.NewGuid(), Provider = "simpay", Amount = 10m,
-            CapturedAmount = 10m, CardLast4 = "0010", Status = CardPaymentStatus.Captured, CorrelationId = Guid.NewGuid(),
-            CreatedAt = midnight, UpdatedAt = midnight
-        };
-        db.CardPayments.Add(payment);
-        PaymentOperation Op(PaymentOperationType type, PaymentOperationStatus status, DateTimeOffset at) => new()
-        {
-            Id = Guid.NewGuid(), PaymentId = payment.Id, Type = type, Status = status, Amount = 1m, Provider = "simpay",
-            ProviderIdempotencyKey = Guid.NewGuid().ToString("N"), CorrelationId = Guid.NewGuid(), CreatedAt = at, UpdatedAt = at
-        };
-        db.PaymentOperations.AddRange(
-            Op(PaymentOperationType.Capture, PaymentOperationStatus.Succeeded, midnight),                     // in
-            Op(PaymentOperationType.Refund, PaymentOperationStatus.Pending, midnight.AddHours(23.9)),         // in
-            Op(PaymentOperationType.Refund, PaymentOperationStatus.Failed, midnight.AddHours(5)),             // failed
-            Op(PaymentOperationType.Authorize, PaymentOperationStatus.Succeeded, midnight.AddHours(1)),      // not money
-            Op(PaymentOperationType.Capture, PaymentOperationStatus.Succeeded, midnight.AddDays(1)),          // next day
-            Op(PaymentOperationType.Capture, PaymentOperationStatus.Succeeded, midnight.AddTicks(-1)));       // previous day
-        await db.SaveChangesAsync();
-
-        var rows = await LedgerSql.SettlementCandidatesAsync(db, day, CancellationToken.None);
-
-        rows.Select(r => (r.Type, r.Status)).Should().BeEquivalentTo(new[] { ("Capture", "Succeeded"), ("Refund", "Pending") });
-    }
-
-    [SqlServerFact]
     public async Task Procedures_and_covering_indexes_exist_after_migration()
     {
         await using var connection = new SqlConnection(_fixture.ConnectionString);
@@ -108,15 +74,15 @@ public sealed class LedgerProcedureSqlServerTests : IClassFixture<SqlServerFixtu
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT
-              (SELECT COUNT(*) FROM sys.procedures WHERE name IN ('usp_LedgerWalletBalance','usp_LedgerWalletSummary','usp_PaymentSettlementCandidates')),
+              (SELECT COUNT(*) FROM sys.procedures WHERE name IN ('usp_LedgerWalletBalance','usp_LedgerWalletSummary')),
               (SELECT COUNT(*) FROM sys.index_columns ic JOIN sys.indexes i ON i.object_id = ic.object_id AND i.index_id = ic.index_id
                  WHERE i.name = 'IX_LedgerEntry_WalletId_CreatedAt' AND ic.is_included_column = 1),
-              (SELECT COUNT(*) FROM sys.indexes WHERE name = 'IX_PaymentOperation_CreatedAt_Type')
+              (SELECT COUNT(*) FROM sys.indexes WHERE name = 'IX_PaymentOperation_CreatedAt_Type') + (SELECT COUNT(*) FROM sys.procedures WHERE name = 'usp_PaymentSettlementCandidates')
             """;
         await using var reader = await command.ExecuteReaderAsync();
         await reader.ReadAsync();
-        reader.GetInt32(0).Should().Be(3);
+        reader.GetInt32(0).Should().Be(2);
         reader.GetInt32(1).Should().Be(3, "Amount, Kind, CorrelationId are included");
-        reader.GetInt32(2).Should().Be(1);
+        reader.GetInt32(2).Should().Be(0, "reconciliation and its index moved to the Operations service");
     }
 }
