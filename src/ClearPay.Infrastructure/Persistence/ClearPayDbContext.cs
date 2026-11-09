@@ -1,4 +1,6 @@
 using ClearPay.Domain.Ledger;
+using ClearPay.Domain.Payments;
+using ClearPay.Domain.Payments;
 using Microsoft.EntityFrameworkCore;
 
 namespace ClearPay.Infrastructure.Persistence;
@@ -27,6 +29,8 @@ public sealed class ClearPayDbContext : DbContext
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public DbSet<LinkedInstrument> LinkedInstruments => Set<LinkedInstrument>();
+
+    public DbSet<ThreeDsSession> ThreeDsSessions => Set<ThreeDsSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

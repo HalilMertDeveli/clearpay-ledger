@@ -5,6 +5,9 @@ using ClearPay.Infrastructure.Identity;
 using ClearPay.Infrastructure.Documents;
 using ClearPay.Infrastructure.Jobs;
 using ClearPay.Infrastructure.Messaging;
+using ClearPay.Infrastructure.Payments;
+using Microsoft.Extensions.Hosting;
+using ClearPay.Infrastructure.Payments;
 using ClearPay.Infrastructure.Persistence;
 using ClearPay.Infrastructure.Realtime;
 using ClearPay.Infrastructure.Time;
@@ -66,6 +69,13 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAdminPanel, SqlAdminPanel>();
         services.AddScoped<IOutboxProcessor, SqlOutboxProcessor>();
         services.AddScoped<OutboxHangfireJob>();
+
+        services.AddSingleton(sp => ThreeDsOptions.From(
+            sp.GetRequiredService<IConfiguration>(),
+            sp.GetRequiredService<IHostEnvironment>()));
+        services.AddScoped<IThreeDsService, SqlThreeDsService>();
+        services.AddSingleton<IFakeAcs, FakeAcs>();
+        services.AddScoped<ThreeDsExpiryHangfireJob>();
 
         services.AddScoped<RestBankGateway>();
         services.AddScoped<SoapBankGateway>();
@@ -134,6 +144,11 @@ public static class ServiceCollectionExtensions
 
             manager.AddOrUpdate<OutboxHangfireJob>(
                 "clearpay-outbox",
+                job => job.Run(),
+                Cron.Minutely);
+
+            manager.AddOrUpdate<ThreeDsExpiryHangfireJob>(
+                "clearpay-3ds-expiry",
                 job => job.Run(),
                 Cron.Minutely);
         }
