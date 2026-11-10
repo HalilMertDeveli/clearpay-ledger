@@ -102,6 +102,7 @@ outbox publisher logs instead of publishing. SQL Server is the only source of tr
 - **Clearing account**: top-ups and withdrawals are pairs against a treasury wallet, so even external money keeps the ledger balanced.
 - **Gateway timeout handling**: a timed-out top-up posts no ledger rows, records a pending outbox row and is answered with 202; retrying with the same key does not double-credit.
 - **Reversal model**: `LedgerPair.CreateRefund` builds a reverse pair instead of editing history (domain-level; there is no refund endpoint yet).
+- **3-D Secure (simulated)**: merchant -> gateway -> fake issuer ACS page -> HMAC-signed callback, with an explicit state machine (`Initiated`, `Challenge`, `Authenticated`, `Failed`, `TimedOut`).
 - **Receipts**: every posting is retrievable by correlation id as JSON or a generated PDF.
 
 ## Double-Entry Ledger
@@ -162,6 +163,56 @@ key scope.
   re-queued from the admin API. Delivery is at-least-once, so consumers should deduplicate by
   correlation id.
 
+## Card Payments: 3-D Secure (simulated)
+
+A card payment is authenticated before any money moves. Everything here is a simulation: the
+"issuer" is an in-process page called **SimBank**, no card network or bank is contacted, and only
+the last four digits of the (test) card number are stored.
+
+```mermaid
+sequenceDiagram
+    participant M as Merchant (app / API client)
+    participant G as Gateway (/api/3ds)
+    participant A as Fake ACS (/fake-acs, "SimBank")
+    M->>G: POST /api/3ds/sessions (JWT, Idempotency-Key, amount, test PAN)
+    G->>G: Luhn check, keep last 4, status Initiated -> Challenge
+    G-->>M: 201 { sessionId, status, acsUrl = /fake-acs?creq=<signed> }
+    M->>A: open acsUrl in a browser / web view
+    A->>A: verify CReq HMAC, show amount + card, ask OTP (demo: 123456)
+    A-->>M: auto-submitting form with the signed CRes
+    M->>G: POST /api/3ds/callback (form: sessionId, transStatus, eci, authValue, issuedAt, nonce, signature)
+    G->>G: verify HMAC + time window, compare-and-set Challenge -> Authenticated | Failed | TimedOut
+    G-->>M: 200 { status }
+```
+
+| State | Reached when |
+|-------|--------------|
+| `Initiated` | Session row created (never visible for long; the fake directory server decides immediately) |
+| `Challenge` | Card is enrolled: the cardholder must answer the ACS challenge |
+| `Authenticated` | ACS returned `transStatus=Y` with an authentication value (ECI 05) |
+| `Failed` | Wrong OTP, cardholder cancelled, or test card `...0002` (issuer refuses without a challenge) |
+| `TimedOut` | No valid result before the deadline (10 minutes by default); set by the Hangfire job `clearpay-3ds-expiry` every minute or lazily on read/callback |
+
+How the callback is trusted:
+
+- **Signed in both directions.** The gateway signs the challenge request (CReq) and the ACS signs
+  the challenge result (CRes) with HMAC-SHA256 over every field (`ThreeDsSigner`). The two
+  messages use different prefixes so one can never be replayed as the other. Comparison is
+  constant-time. A forged or modified result is answered with **401** and changes nothing.
+- **Freshness.** `issuedAt` must be within 5 minutes of the server clock (**400** otherwise).
+- **Exactly one transition.** The state change is `UPDATE ... WHERE Id = @id AND Status = @expected`
+  committed together with its audit row and outbox event (`clearpay.3ds.authenticated`,
+  `.failed`, `.timedout`). A browser double-submit of the same result returns 200
+  `AlreadyApplied`; a different result for a finished session returns **409**; a result after the
+  deadline returns **410** and the session becomes `TimedOut`. The SQL Server test fires eight
+  conflicting callbacks in parallel and asserts exactly one transition and one outbox event.
+- **The callback is anonymous on purpose.** It is posted by the browser from the bank page, so it
+  carries no JWT or cookie; trust comes only from the signature and the state machine.
+- **Key.** `ThreeDs:AcsSharedSecret` (at least 32 bytes). Development falls back to a public
+  placeholder; in every other environment the 3-D Secure endpoints fail (500) until a key is configured.
+
+Authentication alone never posts to the ledger; capturing the payment is a separate step.
+
 ## API Design
 
 JSON API, JWT bearer auth, OpenAPI document at `/swagger`. Errors use RFC 7807
@@ -179,6 +230,10 @@ JSON API, JWT bearer auth, OpenAPI document at `/swagger`. Errors use RFC 7807
 | GET | `/api/movements` | Paged (`page`, `pageSize` 1-50) |
 | GET | `/api/receipts/{correlationId}` (`/pdf`) | Only parties to the movement |
 | GET/POST | `/api/cards` | Linked cards store last 4 digits, scheme and label only (no PAN, no CVV) |
+| POST | `/api/3ds/sessions` | `Idempotency-Key` required. Starts a simulated 3-D Secure authentication; 201 with `acsUrl`, 409 on replay |
+| GET | `/api/3ds/sessions/{id}` | Session state; owner only (404 for others) |
+| GET/POST | `/fake-acs?creq=...` | Fake issuer challenge page (anonymous, HTML) |
+| POST | `/api/3ds/callback` | Signed challenge result (form post, anonymous). 200 / 400 stale / 401 bad signature / 409 / 410 timed out |
 | GET/POST | `/api/admin/*` | `Admin` role: freeze/unfreeze, outbox, audit search |
 | GET | `/api/health` | Liveness plus Redis/RabbitMQ status |
 
@@ -210,13 +265,13 @@ Design decisions:
 
 ## Tests & CI
 
-### Results (measured locally, 2026-11-03)
+### Results (measured locally)
 
 | Suite | Command | Infrastructure | Result |
 |-------|---------|----------------|--------|
-| .NET, with SQL Server | `dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release` with `CLEARPAY_TEST_SQLSERVER` set | SQLite files (created by the tests) + SQL Server 2022 in Docker | **190 passed, 0 failed, 0 skipped** |
-| .NET, without SQL Server | same command, variable unset | SQLite only | 185 passed, 0 failed, 5 skipped (the SQL Server tests) |
-| Flutter | `flutter analyze` and `flutter test` in `mobile/clearpay` | none (mocked HTTP) | no analyzer issues; **20 passed, 0 failed** |
+| .NET, with SQL Server (2026-11-09) | `dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release` with `CLEARPAY_TEST_SQLSERVER` set | SQLite files (created by the tests) + SQL Server 2022 in Docker | **227 passed, 0 failed, 0 skipped** |
+| .NET, without SQL Server (2026-11-09) | same command, variable unset | SQLite only | 221 passed, 0 failed, 6 skipped (the SQL Server tests) |
+| Flutter (2026-11-03) | `flutter analyze` and `flutter test` in `mobile/clearpay` | none (mocked HTTP) | no analyzer issues; **20 passed, 0 failed** |
 | NuGet vulnerabilities | `dotnet list <project> package --vulnerable --include-transitive` | none | no vulnerable packages |
 
 Counts are test cases as reported by the runners (xUnit theories count once per data row).
@@ -235,6 +290,8 @@ What the money tests cover:
 | Authorization: body cannot choose the debited wallet; strangers cannot read transfers or receipts | `LedgerSafetyApiTests`, `TransferApiTests` |
 | Validation: amount <= 0 or > 2 decimals, malformed JSON, oversized key/description | `LedgerSafetyApiTests`, `SqlServerLedgerTests` |
 | Audit row and pending outbox row share the ledger correlation id; none on rejection | `LedgerSafetyApiTests` |
+| 3-D Secure: state machine, signed CReq/CRes, forged / stale / replayed callbacks, expiry, full browser round trip | `ThreeDsServiceTests`, `ThreeDsDomainAndSignerTests`, `ThreeDsApiTests` |
+| 3-D Secure: 8 conflicting callbacks in parallel give exactly one transition and one outbox event | `ThreeDsSqlServerTests` (SQL Server) |
 | Outbox worker, gateway timeout keeps the outbox row | `OutboxProcessorTests`, `FundingExecutorTests` |
 | Database CHECK constraint rejects zero-amount rows | `SqlServerLedgerTests` |
 | Architecture rules between layers | `ArchitectureTests` |
@@ -286,6 +343,7 @@ dotnet user-secrets set "ConnectionStrings:ClearPay" \
   "Server=localhost,1433;Database=ClearPay;User Id=sa;Password=<your MSSQL_SA_PASSWORD>;TrustServerCertificate=True;Encrypt=True" \
   --project src/ClearPay.Web
 dotnet user-secrets set "Jwt:SigningKey" "<at least 32 random characters>" --project src/ClearPay.Web
+dotnet user-secrets set "ThreeDs:AcsSharedSecret" "<at least 32 random characters>" --project src/ClearPay.Web   # optional in Development
 dotnet user-secrets set "Seed:AdminPassword" "<password for the local admin account>" --project src/ClearPay.Web   # optional
 
 # 3. Run (migrations are applied on startup)

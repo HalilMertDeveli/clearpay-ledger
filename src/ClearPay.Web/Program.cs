@@ -28,6 +28,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AllowAnonymousToFolder("/Account");
     options.Conventions.AllowAnonymousToPage("/Error");
     options.Conventions.AllowAnonymousToPage("/SetCulture");
+    options.Conventions.AllowAnonymousToPage("/FakeAcs");
     options.Conventions.AddPageRoute("/Account/Login", "/giris");
     options.Conventions.AddPageRoute("/Account/Register", "/kayit");
 }).AddViewLocalization();
