@@ -5,9 +5,10 @@ using ClearPay.Infrastructure.Identity;
 using ClearPay.Infrastructure.Documents;
 using ClearPay.Infrastructure.Jobs;
 using ClearPay.Infrastructure.Messaging;
+using ClearPay.Application.Payments;
 using ClearPay.Infrastructure.Payments;
+using ClearPay.Infrastructure.Payments.Psp;
 using Microsoft.Extensions.Hosting;
-using ClearPay.Infrastructure.Payments;
 using ClearPay.Infrastructure.Persistence;
 using ClearPay.Infrastructure.Realtime;
 using ClearPay.Infrastructure.Time;
@@ -76,6 +77,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IThreeDsService, SqlThreeDsService>();
         services.AddSingleton<IFakeAcs, FakeAcs>();
         services.AddScoped<ThreeDsExpiryHangfireJob>();
+
+        // Fake PSPs: adding one is a new IPaymentServiceProvider registration, nothing else.
+        services.AddSingleton<SimulatedPspCore>();
+        services.AddSingleton<IPaymentServiceProvider, SimBankRestPsp>();
+        services.AddSingleton<IPaymentServiceProvider, SimBankSoapPsp>();
+        services.AddSingleton<IPaymentServiceProvider, SimPayPsp>();
+        services.AddSingleton<IPspRouter, PspRouter>();
+        services.AddScoped<ICardPaymentService, SqlCardPaymentService>();
 
         services.AddScoped<RestBankGateway>();
         services.AddScoped<SoapBankGateway>();

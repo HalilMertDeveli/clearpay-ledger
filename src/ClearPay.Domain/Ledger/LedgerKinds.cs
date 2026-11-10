@@ -6,7 +6,10 @@ public enum LedgerEntryKind
     Transfer = 0,
     TopUp = 1,
     Withdraw = 2,
-    Refund = 3
+    Refund = 3,
+
+    /// <summary>Card payment captured through a PSP after 3-D Secure (treasury -> customer).</summary>
+    CardPayment = 4
 }
 
 /// <summary>Transfer row status. Gateway pending/fail arrives in TASK-07; TASK-06 posts Completed in one commit.</summary>

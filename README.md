@@ -101,7 +101,7 @@ outbox publisher logs instead of publishing. SQL Server is the only source of tr
 - **Account freeze**: frozen wallets cannot send or withdraw (403); incoming credits still post.
 - **Clearing account**: top-ups and withdrawals are pairs against a treasury wallet, so even external money keeps the ledger balanced.
 - **Gateway timeout handling**: a timed-out top-up posts no ledger rows, records a pending outbox row and is answered with 202; retrying with the same key does not double-credit.
-- **Reversal model**: `LedgerPair.CreateRefund` builds a reverse pair instead of editing history (domain-level; there is no refund endpoint yet).
+- **Reversal model**: history is never edited; card refunds post a reverse pair (customer -> treasury) and a refund the PSP declines posts the pair back (`/api/payments/{id}/refunds`). Wallet-to-wallet transfers still have no refund endpoint.
 - **3-D Secure (simulated)**: merchant -> gateway -> fake issuer ACS page -> HMAC-signed callback, with an explicit state machine (`Initiated`, `Challenge`, `Authenticated`, `Failed`, `TimedOut`).
 - **Receipts**: every posting is retrievable by correlation id as JSON or a generated PDF.
 
@@ -213,6 +213,49 @@ How the callback is trusted:
 
 Authentication alone never posts to the ledger; capturing the payment is a separate step.
 
+## Card Payments: PSP Adapters, Capture, Refund, Void
+
+An `Authenticated` 3-D Secure session can pay for exactly one card payment, which funds the
+customer's wallet. The payment service talks to providers only through
+`IPaymentServiceProvider` (authorize, capture, refund, void). Three fake providers sit behind it,
+each with its own wire format, so the adapter layer does real mapping work:
+
+| Adapter | Wire format (simulated in-process) | Documented fault trigger |
+|---------|-----------------------------------|--------------------------|
+| `simbank-rest` (default) | JSON, decimal strings, `APPROVED` / `DECLINED` | authorize `x.51` -> declined `51`; refund `x.52` -> declined `R52` |
+| `simbank-soap` | SOAP 1.1 XML envelope, `ResponseCode` `00` = approved | authorize `x.05` -> declined `05` |
+| `simpay` | minor units (kuruş as integers), `succeeded` / `failed` | any amount `x.99` -> executed by the PSP but the **response is lost** (caller sees a timeout) |
+
+None of them contacts a network. Their own "bank side" journal is the `sim.PspTransaction` table,
+written only by the simulators through a separate DbContext scope; settlement files for
+reconciliation are produced from it, never from the ledger. Adding a provider means one more
+`IPaymentServiceProvider` registration (`PspRouter` picks it by name).
+
+| Operation | Ledger effect | Rule |
+|-----------|---------------|------|
+| Authorize | none | 3-D Secure session must be `Authenticated`, owned by the caller and unused (claimed with a compare-and-set, unique index `UX_CardPayment_ThreeDsSessionId`) |
+| Capture (default on create) | treasury -> customer, kind `CardPayment` | posted only after the PSP approved; once per payment |
+| Refund (full or partial) | customer -> treasury, kind `Refund` | sum of refunds <= captured amount; the wallet must still hold the amount; a PSP decline posts the reverse pair |
+| Void | none | only before capture |
+
+How an operation is made idempotent end to end:
+
+1. **Reserve in SQL** (Serializable): `Idempotency-Key` + request fingerprint, a `PaymentOperation`
+   row with a **deterministic provider key** (`<paymentId>-auth`, `-capture`, `<operationId>-refund`),
+   and the money rule (for refunds the wallet debit is posted here, so two racing refunds cannot
+   both pass the check).
+2. **Call the PSP outside any transaction** with that provider key. Every fake PSP stores the key
+   and answers a repeat with the original result instead of executing again.
+3. **Record the answer** in one transaction: operation status, payment status, ledger pair, audit
+   row and outbox event (`clearpay.payment.authorized`, `.captured`, `.declined`, `.refunded`,
+   `.refund_failed`, `.voided`).
+
+A PSP timeout leaves the operation `Pending` and returns **202**. Retrying with the same
+`Idempotency-Key` re-drives it with the same provider key: the `simpay` lost-response test needs
+three calls to finish authorization and capture and still ends with one PSP authorization, one
+PSP capture and one ledger pair. CHECK constraints back the rules in the database
+(`CK_CardPayment_Refund_LE_Captured`, `CK_CardPayment_Captured_LE_Amount`).
+
 ## API Design
 
 JSON API, JWT bearer auth, OpenAPI document at `/swagger`. Errors use RFC 7807
@@ -234,6 +277,11 @@ JSON API, JWT bearer auth, OpenAPI document at `/swagger`. Errors use RFC 7807
 | GET | `/api/3ds/sessions/{id}` | Session state; owner only (404 for others) |
 | GET/POST | `/fake-acs?creq=...` | Fake issuer challenge page (anonymous, HTML) |
 | POST | `/api/3ds/callback` | Signed challenge result (form post, anonymous). 200 / 400 stale / 401 bad signature / 409 / 410 timed out |
+| GET | `/api/payments/providers` | Names of the registered PSP adapters |
+| POST | `/api/payments` | `Idempotency-Key` required. `{ threeDsSessionId, provider?, capture? }`. 201 / 202 PSP timeout / 402 declined / 409 replay or 3DS already used / 422 3DS not authenticated |
+| POST | `/api/payments/{id}/capture`, `/void` | `Idempotency-Key` required. 200 / 202 / 402 / 409 / 422 wrong state |
+| POST | `/api/payments/{id}/refunds` | `Idempotency-Key` required. `{ amount }`, partial allowed. 200 / 202 / 402 declined (ledger reversed) / 409 / 422 exceeds refundable or insufficient wallet balance |
+| GET | `/api/payments/{id}` | Payment with its operations; owner only |
 | GET/POST | `/api/admin/*` | `Admin` role: freeze/unfreeze, outbox, audit search |
 | GET | `/api/health` | Liveness plus Redis/RabbitMQ status |
 
@@ -269,8 +317,8 @@ Design decisions:
 
 | Suite | Command | Infrastructure | Result |
 |-------|---------|----------------|--------|
-| .NET, with SQL Server (2026-11-09) | `dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release` with `CLEARPAY_TEST_SQLSERVER` set | SQLite files (created by the tests) + SQL Server 2022 in Docker | **227 passed, 0 failed, 0 skipped** |
-| .NET, without SQL Server (2026-11-09) | same command, variable unset | SQLite only | 221 passed, 0 failed, 6 skipped (the SQL Server tests) |
+| .NET, with SQL Server (2026-11-09) | `dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release` with `CLEARPAY_TEST_SQLSERVER` set | SQLite files (created by the tests) + SQL Server 2022 in Docker | **246 passed, 0 failed, 0 skipped** |
+| .NET, without SQL Server (2026-11-09) | same command, variable unset | SQLite only | 238 passed, 0 failed, 8 skipped (the SQL Server tests) |
 | Flutter (2026-11-03) | `flutter analyze` and `flutter test` in `mobile/clearpay` | none (mocked HTTP) | no analyzer issues; **20 passed, 0 failed** |
 | NuGet vulnerabilities | `dotnet list <project> package --vulnerable --include-transitive` | none | no vulnerable packages |
 
@@ -292,6 +340,8 @@ What the money tests cover:
 | Audit row and pending outbox row share the ledger correlation id; none on rejection | `LedgerSafetyApiTests` |
 | 3-D Secure: state machine, signed CReq/CRes, forged / stale / replayed callbacks, expiry, full browser round trip | `ThreeDsServiceTests`, `ThreeDsDomainAndSignerTests`, `ThreeDsApiTests` |
 | 3-D Secure: 8 conflicting callbacks in parallel give exactly one transition and one outbox event | `ThreeDsSqlServerTests` (SQL Server) |
+| PSP adapters: all three authorize + capture; declines post nothing; void before capture; partial refunds capped; refund decline reversed; lost PSP response resumed without double posting; replayed keys | `CardPaymentServiceTests`, `CardPaymentApiTests` |
+| Ten parallel 30.00 refunds on a 100.00 payment: exactly three succeed; CHECK constraint rejects over-refund | `CardPaymentSqlServerTests` (SQL Server) |
 | Outbox worker, gateway timeout keeps the outbox row | `OutboxProcessorTests`, `FundingExecutorTests` |
 | Database CHECK constraint rejects zero-amount rows | `SqlServerLedgerTests` |
 | Architecture rules between layers | `ArchitectureTests` |
@@ -409,7 +459,7 @@ Both screenshots show the local Development seed account on a `.test` domain; no
   key first and pass it to the provider as its idempotency key.
 - The outbox worker is a single Hangfire job with at-least-once delivery; it is not designed for
   multiple competing workers.
-- Refunds exist as a domain operation (`LedgerPair.CreateRefund`) but have no API or UI.
+- Card refunds exist (`/api/payments/{id}/refunds`); wallet-to-wallet transfers cannot be refunded through the API or UI. There is no web UI for card payments yet (API and the fake ACS page only).
 - The fast test suite uses SQLite; SQL Server-specific behaviour (isolation, deadlocks,
   constraints) is covered only by the SQL Server tests.
 

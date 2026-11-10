@@ -265,6 +265,198 @@ namespace ClearPay.Infrastructure.Persistence.Migrations
                     b.ToTable("Wallet", (string)null);
                 });
 
+            modelBuilder.Entity("ClearPay.Domain.Payments.CardPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("CapturedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("CardLast4")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("nvarchar(4)");
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DeclineCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("ProviderReference")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<decimal>("RefundedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ThreeDsSessionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ThreeDsSessionId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CardPayment_ThreeDsSessionId");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_CardPayment_UserId");
+
+                    b.ToTable("CardPayment", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CardPayment_Amount_Positive", "[Amount] > 0");
+
+                            t.HasCheckConstraint("CK_CardPayment_Captured_LE_Amount", "[CapturedAmount] * 1.0 >= 0 AND [CapturedAmount] * 1.0 <= [Amount] * 1.0");
+
+                            t.HasCheckConstraint("CK_CardPayment_Refund_LE_Captured", "[RefundedAmount] * 1.0 >= 0 AND [RefundedAmount] * 1.0 <= [CapturedAmount] * 1.0");
+                        });
+                });
+
+            modelBuilder.Entity("ClearPay.Domain.Payments.PaymentOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("ProviderIdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("ProviderReference")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PaymentId")
+                        .HasDatabaseName("IX_PaymentOperation_PaymentId");
+
+                    b.HasIndex("Provider", "ProviderIdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PaymentOperation_Provider_Key");
+
+                    b.ToTable("PaymentOperation", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PaymentOperation_Amount_Positive", "[Amount] > 0");
+                        });
+                });
+
+            modelBuilder.Entity("ClearPay.Domain.Payments.SimPspTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("Approved")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("AuthorizationReference")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DeclineCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<bool>("ResponseLost")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Provider", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_SimPspTransaction_Provider_Key");
+
+                    b.HasIndex("Provider", "Reference")
+                        .HasDatabaseName("IX_SimPspTransaction_Provider_Reference");
+
+                    b.ToTable("PspTransaction", "sim");
+                });
+
             modelBuilder.Entity("ClearPay.Domain.Payments.ThreeDsSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -367,6 +559,15 @@ namespace ClearPay.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("FK_Transfer_Wallet_To");
+                });
+
+            modelBuilder.Entity("ClearPay.Domain.Payments.PaymentOperation", b =>
+                {
+                    b.HasOne("ClearPay.Domain.Payments.CardPayment", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }
