@@ -256,6 +256,38 @@ three calls to finish authorization and capture and still ends with one PSP auth
 PSP capture and one ledger pair. CHECK constraints back the rules in the database
 (`CK_CardPayment_Refund_LE_Captured`, `CK_CardPayment_Captured_LE_Amount`).
 
+## Nightly Reconciliation (Hangfire)
+
+Every night at 02:30 UTC the Hangfire job `clearpay-reconciliation-nightly` reconciles
+**yesterday's** captures and refunds against each PSP's settlement file. An admin can run any date
+by hand (`POST /api/admin/reconciliation/runs?date=yyyy-MM-dd`).
+
+1. **Settlement files.** The fake PSPs play their end-of-day process: `SimSettlementFileSource`
+   writes `{provider}_{yyyyMMdd}.csv` (`provider,settlement_date,type,reference,merchant_ref,amount,currency`)
+   from their own journal into `Reconciliation:SettlementDirectory` and the job parses it
+   (`SettlementCsv`; malformed lines are reported, not skipped). Two documented faults give the job
+   something to find: amounts ending in `.77` are left out of the file, amounts ending in `.78`
+   are settled one kuruş higher.
+2. **Our side.** `PaymentOperation` rows of type Capture/Refund for that date that did not fail.
+3. **Matching** (`ReconciliationEngine`, pure and unit-tested): by provider reference, then - for
+   operations whose PSP response was lost and therefore have no reference - by type + merchant
+   reference.
+
+| Item kind | Meaning | What an operator does |
+|-----------|---------|-----------------------|
+| `Matched` | same reference and amount | nothing |
+| `MissingInSettlement` | we captured/refunded, the PSP did not settle it | raise with the PSP |
+| `MissingInLedger` | the PSP settled something we have no record of | investigate; possible duplicate or foreign transaction |
+| `AmountMismatch` | same reference, different amount | raise with the PSP |
+| `PendingConfirmedBySettlement` | our operation is still `Pending` (timeout) but the PSP settled it | finish it: retry with the same key |
+| `PendingNotInSettlement` | still `Pending` and not settled | most likely never happened at the PSP |
+
+Every item is stored (`ReconciliationRun`, `ReconciliationItem`), each mismatch is logged as a
+warning with provider, reference and amounts, and the run publishes
+`clearpay.reconciliation.completed` (matched / mismatch counts, net totals) through the outbox.
+A date with a completed run is skipped by the nightly job (Hangfire may retry a failed run up to
+three times); a manual run always creates a new run.
+
 ## API Design
 
 JSON API, JWT bearer auth, OpenAPI document at `/swagger`. Errors use RFC 7807
@@ -282,6 +314,8 @@ JSON API, JWT bearer auth, OpenAPI document at `/swagger`. Errors use RFC 7807
 | POST | `/api/payments/{id}/capture`, `/void` | `Idempotency-Key` required. 200 / 202 / 402 / 409 / 422 wrong state |
 | POST | `/api/payments/{id}/refunds` | `Idempotency-Key` required. `{ amount }`, partial allowed. 200 / 202 / 402 declined (ledger reversed) / 409 / 422 exceeds refundable or insufficient wallet balance |
 | GET | `/api/payments/{id}` | Payment with its operations; owner only |
+| GET | `/api/admin/reconciliation/runs`, `/runs/{id}` | `Admin` role: run summaries; one run with every matched / mismatched item |
+| POST | `/api/admin/reconciliation/runs?date=yyyy-MM-dd` | `Admin` role: reconcile a business date now (default yesterday UTC) |
 | GET/POST | `/api/admin/*` | `Admin` role: freeze/unfreeze, outbox, audit search |
 | GET | `/api/health` | Liveness plus Redis/RabbitMQ status |
 
@@ -303,7 +337,7 @@ Design decisions:
 | Data | SQL Server 2022 (EF Core 8 migrations); SQLite for fast integration tests |
 | Identity | ASP.NET Core Identity, JWT bearer, optional Google/Apple/Firebase sign-in |
 | Validation | FluentValidation |
-| Background jobs | Hangfire (outbox processing) |
+| Background jobs | Hangfire (outbox processing, 3-D Secure expiry every minute, nightly reconciliation) |
 | Cache / messaging | Redis (StackExchange.Redis), RabbitMQ (RabbitMQ.Client), both optional |
 | Realtime | SignalR (refresh hints only, never balances) |
 | Docs | Swashbuckle / OpenAPI |
@@ -317,8 +351,8 @@ Design decisions:
 
 | Suite | Command | Infrastructure | Result |
 |-------|---------|----------------|--------|
-| .NET, with SQL Server (2026-11-09) | `dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release` with `CLEARPAY_TEST_SQLSERVER` set | SQLite files (created by the tests) + SQL Server 2022 in Docker | **246 passed, 0 failed, 0 skipped** |
-| .NET, without SQL Server (2026-11-09) | same command, variable unset | SQLite only | 238 passed, 0 failed, 8 skipped (the SQL Server tests) |
+| .NET, with SQL Server (2026-11-09) | `dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release` with `CLEARPAY_TEST_SQLSERVER` set | SQLite files (created by the tests) + SQL Server 2022 in Docker | **252 passed, 0 failed, 0 skipped** |
+| .NET, without SQL Server (2026-11-09) | same command, variable unset | SQLite only | 244 passed, 0 failed, 8 skipped (the SQL Server tests) |
 | Flutter (2026-11-03) | `flutter analyze` and `flutter test` in `mobile/clearpay` | none (mocked HTTP) | no analyzer issues; **20 passed, 0 failed** |
 | NuGet vulnerabilities | `dotnet list <project> package --vulnerable --include-transitive` | none | no vulnerable packages |
 
@@ -342,6 +376,7 @@ What the money tests cover:
 | 3-D Secure: 8 conflicting callbacks in parallel give exactly one transition and one outbox event | `ThreeDsSqlServerTests` (SQL Server) |
 | PSP adapters: all three authorize + capture; declines post nothing; void before capture; partial refunds capped; refund decline reversed; lost PSP response resumed without double posting; replayed keys | `CardPaymentServiceTests`, `CardPaymentApiTests` |
 | Ten parallel 30.00 refunds on a 100.00 payment: exactly three succeed; CHECK constraint rejects over-refund | `CardPaymentSqlServerTests` (SQL Server) |
+| Reconciliation: every mismatch kind from real fake-PSP payments and real settlement files; nightly job targets yesterday and skips a finished date; admin-only API | `ReconciliationEngineTests`, `ReconciliationServiceTests`, `ReconciliationAdminApiTests` |
 | Outbox worker, gateway timeout keeps the outbox row | `OutboxProcessorTests`, `FundingExecutorTests` |
 | Database CHECK constraint rejects zero-amount rows | `SqlServerLedgerTests` |
 | Architecture rules between layers | `ArchitectureTests` |
@@ -457,6 +492,9 @@ Both screenshots show the local Development seed account on a `.test` domain; no
 - Concurrent duplicate top-up requests can both reach the simulated gateway before one of them
   wins the idempotency insert; the ledger still posts once. A real integration would reserve the
   key first and pass it to the provider as its idempotency key.
+- Reconciliation buckets operations by the UTC date their PSP call started; an operation retried across
+  midnight can land on different dates on each side and show up as two mismatches. Settlement files
+  come from the in-process simulators, not from an SFTP drop.
 - The outbox worker is a single Hangfire job with at-least-once delivery; it is not designed for
   multiple competing workers.
 - Card refunds exist (`/api/payments/{id}/refunds`); wallet-to-wallet transfers cannot be refunded through the API or UI. There is no web UI for card payments yet (API and the fake ACS page only).

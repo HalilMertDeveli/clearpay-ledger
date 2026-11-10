@@ -57,3 +57,6 @@ mobile/clearpay/ios/Runner/GoogleService-Info.plist
 mobile/clearpay/macos/Runner/GoogleService-Info.plist
 mobile/clearpay/firebase.json
 mobile/clearpay/.firebaserc
+
+# Fake PSP settlement files written by the reconciliation demo
+**/App_Data/settlements/
