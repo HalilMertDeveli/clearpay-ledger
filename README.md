@@ -1,17 +1,69 @@
+<div align="center">
+
 # ClearPay Ledger
 
-A digital-wallet backend built around a **double-entry ledger**, **idempotent money APIs** and
-**single-transaction consistency**, with an ASP.NET Core Razor web UI and a Flutter mobile client
-on top of the same API.
+**A double-entry wallet backend with idempotent money APIs, simulated 3-D Secure card payments, a separate reconciliation service, a Razor web UI and a Flutter client.**
+<br/>
+<sub>İdempotent para API'leri, simüle 3-D Secure kart ödemeleri, ayrı bir mutabakat servisi, Razor web arayüzü ve Flutter istemcisi olan çift taraflı kayıt (double-entry) tabanlı cüzdan backend'i.</sub>
 
-> **Portfolio demo, not a banking product.** ClearPay is not a licensed bank, payment institution
-> or e-money issuer. No real money moves: the bank gateway used for top-up and withdrawal is a
-> simulated REST/SOAP stub. Amounts are demo Turkish lira (TRY). The UI defaults to Turkish and
-> also ships English, German and French.
+<br/>
+
+![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&logo=dotnet&logoColor=white)
+![SQL Server 2022](https://img.shields.io/badge/SQL%20Server-2022-CC2927?style=flat-square&logo=microsoftsqlserver&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-Dart%203-02569B?style=flat-square&logo=flutter&logoColor=white)
+[![CI](https://github.com/HalilMertDeveli/clearpay-ledger/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/HalilMertDeveli/clearpay-ledger/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+![Status](https://img.shields.io/badge/status-prototype%20%2F%20portfolio%20demo-orange?style=flat-square)
+
+<p><a href="#english">English</a> · <a href="#turkce">Türkçe</a></p>
+
+</div>
+
+> [!WARNING]
+> **Portfolio demo, not a banking product.** ClearPay is not a licensed bank, payment institution or e-money issuer. No real money moves: the bank gateway, the payment service providers and the 3-D Secure issuer page are simulated, and amounts are demo Turkish lira (TRY).
+> <br/>**Portföy demosudur, bankacılık ürünü değildir.** ClearPay lisanslı bir banka, ödeme kuruluşu veya elektronik para kuruluşu değildir. Gerçek para hareketi yoktur: banka gateway'i, ödeme sağlayıcıları (PSP) ve 3-D Secure banka sayfası simüle edilmiştir; tutarlar demo Türk lirasıdır (TRY).
+
+| | |
+|---|---|
+| **Type · Tür** | Wallet API + Razor web UI + Flutter client · Cüzdan API'si + Razor web arayüzü + Flutter istemcisi |
+| **Status · Durum** | Prototype / portfolio demo, runs locally · Prototip / portföy demosu, yerelde çalışır |
+| **Stack · Teknoloji** | .NET 8, ASP.NET Core (Razor Pages + Web API), EF Core 8, SQL Server 2022 (T-SQL stored procedures), Identity + JWT, Hangfire, Redis, RabbitMQ, SignalR, Serilog + OpenTelemetry, Flutter |
+| **Core ideas · Temel fikirler** | Double-entry ledger, derived balances, `Idempotency-Key`, single-transaction posting, transactional outbox, 3-D Secure, PSP adapters, nightly reconciliation, RabbitMQ retry / DLQ / inbox, end-to-end tracing |
+| **Tests · Testler** | xUnit + `WebApplicationFactory` (SQLite, SQL Server and RabbitMQ), Flutter widget tests, GitHub Actions |
+| **UI languages · Arayüz dilleri** | Turkish (default), English, German, French · Türkçe (varsayılan), İngilizce, Almanca, Fransızca |
 
 ---
 
-## Problem & Solution
+<a id="english"></a>
+
+## English
+
+- [Problem & Solution](#en-problem)
+- [Features](#en-features)
+- [Architecture](#en-architecture)
+- [Core Banking Concepts](#en-concepts)
+- [Double-Entry Ledger](#en-ledger)
+- [Idempotency](#en-idempotency)
+- [Transaction Consistency](#en-consistency)
+- [Card Payments: 3-D Secure (simulated)](#en-3ds)
+- [Card Payments: PSP Adapters, Capture, Refund, Void](#en-psp)
+- [Operations Service: Notifications and Reconciliation](#en-operations)
+- [Messaging: RabbitMQ Retry, Dead-Letter Queue, Inbox](#en-messaging)
+- [T-SQL: Stored Procedures, Covering Indexes, Measured Plans](#en-tsql)
+- [Observability: One Payment, One Trace, Across Both Services](#en-observability)
+- [API Design](#en-api)
+- [Technology Stack](#en-stack)
+- [Repository Structure](#en-structure)
+- [Tests & CI](#en-tests)
+- [Installation](#en-install)
+- [Demo Screenshots](#en-screenshots)
+- [Security Considerations](#en-security)
+- [Limitations](#en-limitations)
+- [License](#en-license)
+
+<a id="en-problem"></a>
+
+### Problem & Solution
 
 **Problem.** The classic wallet bug is `UPDATE Wallet SET Balance = Balance - @amount`. It loses
 history, cannot be audited, double-charges when a mobile client retries after a timeout, and
@@ -23,7 +75,35 @@ the transfer record, the idempotency key, an audit row and an outbox message. Th
 sum of a wallet's ledger rows. A replayed request with the same `Idempotency-Key` returns
 **409 Conflict** and posts nothing.
 
-## Architecture
+<a id="en-features"></a>
+
+### Features
+
+| Area | Capability | Where |
+|---|---|---|
+| Ledger | Balanced debit/credit pairs, derived balance, no-overdraft check, reversal (refund) pair | `src/ClearPay.Domain/Ledger/LedgerPair.cs` |
+| Transfers | Serializable transaction: ledger pair + transfer + idempotency key + audit + outbox | `src/ClearPay.Infrastructure/Persistence/SqlTransferExecutor.cs` |
+| Top-up / withdraw | Pairs against a treasury (clearing) wallet via the simulated bank gateway | `SqlFundingExecutor.cs`, `src/ClearPay.Infrastructure/Banking/` |
+| Idempotency | `Idempotency-Key` header, primary-key uniqueness, SHA-256 request fingerprint | `SqlIdempotencyStore.cs`, `src/ClearPay.Web/Controllers/TransfersController.cs` |
+| Outbox and messaging | Committed outbox rows published to RabbitMQ with publisher confirms; retry, DLQ and inbox deduplication | `SqlOutboxProcessor.cs`, `src/ClearPay.Messaging/` |
+| 3-D Secure | Fake issuer ACS page, HMAC-signed messages in both directions, explicit state machine | `/api/3ds`, `/fake-acs`, `ThreeDsSigner` |
+| Card payments | Three fake PSPs behind one interface; authorize, capture, partial refund, void (idempotent) | `IPaymentServiceProvider`, `PspRouter`, `/api/payments` |
+| Reconciliation | Nightly Hangfire job matches PSP settlement files in the separate Operations service | `src/ClearPay.Operations/` |
+| T-SQL | Stored procedures, covering indexes, measured execution plans | `LedgerProcedures.sql`, `docs/sql/` |
+| Observability | Serilog + OpenTelemetry; one trace per payment across both services | `src/ClearPay.ServiceDefaults/`, `docs/RUNBOOK-failed-payment.md` |
+| Receipts | JSON and generated PDF receipts by correlation id | `ReceiptsController.cs`, `src/ClearPay.Infrastructure/Documents/SimplePdfReceiptRenderer.cs` |
+| Auth | ASP.NET Identity (cookie for Razor), JWT for API/mobile, optional Google/Apple/Firebase | `src/ClearPay.Infrastructure/Identity/` |
+| Admin | Freeze/unfreeze wallets, outbox view and re-queue, audit search | `AdminApiController.cs`, `SqlAdminPanel.cs`, `Pages/Admin.cshtml` |
+| Linked cards | Stores last four digits, scheme and label only | `CardsController.cs`, `src/ClearPay.Application/Funding/CardBindingParser.cs` |
+| Realtime | SignalR `/hubs/wallet` sends refresh hints, never balances | `src/ClearPay.Web/Realtime/` |
+| Caching | Optional Redis wallet-summary cache, invalidated after commit | `src/ClearPay.Infrastructure/Caching/` |
+| Web UI | Razor Pages: overview, transfer, cards, top-up/withdraw, movements, receipt, admin | `src/ClearPay.Web/Pages/` |
+| Localization | `tr` (default), `en`, `de`, `fr` resources | `src/ClearPay.Web/Localization/`, `src/ClearPay.Web/Resources/Localization/` |
+| Mobile | Flutter JWT client with QR, PDF receipt sharing, SignalR refresh | `mobile/clearpay/lib/` |
+
+<a id="en-architecture"></a>
+
+### Architecture
 
 Four projects in a dependency-inverted (onion / clean) layout. The rules are enforced by
 `ArchitectureTests` (for example: Domain has no package references, Web pages never compute ledger
@@ -93,7 +173,9 @@ Redis and RabbitMQ are optional: without Redis the summary is read from SQL. Wit
 `ConnectionStrings:RabbitMq` the outbox only logs events; with a configured broker that is down,
 events wait in the outbox and are published when it comes back. SQL Server is the only source of truth.
 
-## Core Banking Concepts Demonstrated
+<a id="en-concepts"></a>
+
+### Core Banking Concepts Demonstrated
 
 - **Double-entry bookkeeping**: every movement is one debit (`-amount`) and one credit (`+amount`) sharing a `PairId` and `CorrelationId`.
 - **Derived balances**: no `Balance` column exists on `Wallet`; balance = sum of the wallet's signed entries.
@@ -109,7 +191,9 @@ events wait in the outbox and are published when it comes back. SQL Server is th
 - **3-D Secure (simulated)**: merchant -> gateway -> fake issuer ACS page -> HMAC-signed callback, with an explicit state machine (`Initiated`, `Challenge`, `Authenticated`, `Failed`, `TimedOut`).
 - **Receipts**: every posting is retrievable by correlation id as JSON or a generated PDF.
 
-## Double-Entry Ledger
+<a id="en-ledger"></a>
+
+### Double-Entry Ledger
 
 ```text
 Transfer of 25.00 from A to B, correlation C, pair P
@@ -133,7 +217,9 @@ Why no balance column? A stored balance is a second source of truth that can dri
 entries. Deriving it makes "balance equals the sum of entries" true by construction; the cost is a
 read over the wallet's rows, acceptable at demo scale (see Limitations).
 
-## Idempotency
+<a id="en-idempotency"></a>
+
+### Idempotency
 
 `POST /api/transfers` requires an `Idempotency-Key` header (max 128 characters).
 
@@ -150,7 +236,33 @@ to the client ("already processed, not charged again") and still returns the ori
 client can open the existing receipt. Top-up and withdrawal follow the same rules with their own
 key scope.
 
-## Transaction Consistency
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API as TransfersController
+    participant EX as SqlTransferExecutor
+    participant DB as SQL Server
+    C->>API: POST /api/transfers with Idempotency-Key K
+    API->>EX: TransferCommand, sender taken from JWT
+    EX->>DB: look up key K
+    alt key already stored
+        EX-->>API: Replay
+        API-->>C: 409 with original transferId
+    else new key
+        EX->>DB: BEGIN TRAN (Serializable)
+        EX->>DB: re-check K and overdraft
+        EX->>DB: insert ledger pair, transfer, key, audit, outbox
+        EX->>DB: COMMIT
+        EX-->>API: Posted
+        API-->>C: 201 with transferId and correlationId
+    end
+```
+
+<sub>Transfer request flow with an idempotency key, following `SqlTransferExecutor`.</sub>
+
+<a id="en-consistency"></a>
+
+### Transaction Consistency
 
 - Transfers and fundings run in a single EF Core transaction at **Serializable** isolation. The
   overdraft check reads the sender's entries inside that transaction, so two concurrent debits
@@ -168,7 +280,9 @@ key scope.
   re-queued from the admin API. Delivery is at-least-once; consumers deduplicate on `MessageId`
   with an inbox table (see Messaging).
 
-## Card Payments: 3-D Secure (simulated)
+<a id="en-3ds"></a>
+
+### Card Payments: 3-D Secure (simulated)
 
 A card payment is authenticated before any money moves. Everything here is a simulation: the
 "issuer" is an in-process page called **SimBank**, no card network or bank is contacted, and only
@@ -218,7 +332,9 @@ How the callback is trusted:
 
 Authentication alone never posts to the ledger; capturing the payment is a separate step.
 
-## Card Payments: PSP Adapters, Capture, Refund, Void
+<a id="en-psp"></a>
+
+### Card Payments: PSP Adapters, Capture, Refund, Void
 
 An `Authenticated` 3-D Secure session can pay for exactly one card payment, which funds the
 customer's wallet. The payment service talks to providers only through
@@ -261,7 +377,9 @@ three calls to finish authorization and capture and still ends with one PSP auth
 PSP capture and one ledger pair. CHECK constraints back the rules in the database
 (`CK_CardPayment_Refund_LE_Captured`, `CK_CardPayment_Captured_LE_Amount`).
 
-## Operations Service: Notifications and Reconciliation (separate process)
+<a id="en-operations"></a>
+
+### Operations Service: Notifications and Reconciliation (separate process)
 
 Notifications and the nightly reconciliation run in their own ASP.NET Core service,
 `src/ClearPay.Operations`, with **their own database** (`ClearPayOps`, schema `ops`). It never opens
@@ -344,7 +462,9 @@ Set `ConnectionStrings:Operations`, `ConnectionStrings:RabbitMq`, the same `Jwt:
 ledger host, and the same `Reconciliation:SettlementDirectory` in both services (default: a
 `clearpay-settlements` folder under the OS temp directory).
 
-## Messaging: RabbitMQ Retry, Dead-Letter Queue, Inbox
+<a id="en-messaging"></a>
+
+### Messaging: RabbitMQ Retry, Dead-Letter Queue, Inbox
 
 Outbox rows are published to the topic exchange `clearpay.events` (routing key = event type,
 `MessageId` = outbox row id, persistent, **publisher confirms**). If the broker is configured but
@@ -384,7 +504,9 @@ clearpay.events (topic) --clearpay.payment.captured--> clearpay.cashback ----> h
 - **Trace context**: `traceparent` / `tracestate` travel in the AMQP headers and the consumer starts its
   span as a child of the publisher's (`ClearPay.Messaging` activity source).
 
-## T-SQL: Stored Procedures, Covering Indexes, Measured Plans
+<a id="en-tsql"></a>
+
+### T-SQL: Stored Procedures, Covering Indexes, Measured Plans
 
 The hot read paths used to be EF queries that pulled every ledger row of a wallet to the app and
 summed it in C#. On SQL Server they now call stored procedures that answer from covering indexes
@@ -422,7 +544,9 @@ $env:CLEARPAY_BENCH_SA_PASSWORD = '<sa password of a throw-away local container>
 ./scripts/sql/Measure-LedgerPlans.ps1 -Server '127.0.0.1,14339'
 ```
 
-## Observability: One Payment, One Trace, Across Both Services
+<a id="en-observability"></a>
+
+### Observability: One Payment, One Trace, Across Both Services
 
 Both hosts call `AddClearPayObservability` (`src/ClearPay.ServiceDefaults`): **Serilog** writes
 structured logs to the console and **Seq**, every event carrying `TraceId` / `SpanId` and `Service`;
@@ -474,7 +598,10 @@ docker compose -f docker-compose.observability.yml up -d   # collector, Tempo, P
 
 All observability containers bind to 127.0.0.1 and run without authentication (Grafana anonymous
 admin): local demo only.
-## API Design
+
+<a id="en-api"></a>
+
+### API Design
 
 JSON API, JWT bearer auth, OpenAPI document at `/swagger`. Errors use RFC 7807
 `application/problem+json`.
@@ -484,6 +611,7 @@ JSON API, JWT bearer auth, OpenAPI document at `/swagger`. Errors use RFC 7807
 | POST | `/api/register` | Creates a customer, returns a JWT (201) |
 | POST | `/api/token` | Email + password -> JWT (8 h) |
 | POST | `/api/token/firebase` | Exchanges a Firebase ID token for a JWT (only if Firebase is configured) |
+| POST | `/api/password/forgot`, `/api/password/reset` | Password recovery (the demo mailer writes to the log) |
 | GET | `/api/wallet` | Balance (derived), month in/out, last movements |
 | POST | `/api/transfers` | `Idempotency-Key` required. 201 / 400 / 401 / 403 frozen / 404 recipient / 409 replay / 422 insufficient funds / 503 retryable |
 | GET | `/api/transfers/{id}` | Only the sender or recipient can read it; others get 404 |
@@ -517,7 +645,9 @@ Design decisions:
 - **Two auth schemes, one user store**: cookie auth for Razor (with antiforgery), JWT for the
   API and mobile; the money API never accepts the browser cookie.
 
-## Technology Stack
+<a id="en-stack"></a>
+
+### Technology Stack
 
 | Area | Choice |
 |------|--------|
@@ -534,9 +664,37 @@ Design decisions:
 | Tests | xUnit, FluentAssertions, `WebApplicationFactory`, Flutter widget tests |
 | CI | GitHub Actions with a SQL Server service container |
 
-## Tests & CI
+<a id="en-structure"></a>
 
-### Results (measured locally)
+### Repository Structure
+
+```text
+clearpay-ledger/
+├── src/
+│   ├── ClearPay.Domain/            # Ledger entities and money rules, no packages
+│   ├── ClearPay.Application/       # Ports, commands/outcomes, validators, reconciliation engine
+│   ├── ClearPay.Infrastructure/    # EF Core, migrations, Identity/JWT, gateways, PSPs, outbox, cache
+│   ├── ClearPay.Messaging/         # RabbitMQ topology, consumer host with retry/DLQ, inbox
+│   ├── ClearPay.ServiceDefaults/   # Serilog + OpenTelemetry setup
+│   ├── ClearPay.Operations/        # Separate service: notifications + reconciliation, own database
+│   └── ClearPay.Web/               # Program.cs, API controllers, Razor Pages, SignalR hub
+├── tests/
+│   ├── ClearPay.Tests/             # xUnit unit, integration, architecture, SQL Server and RabbitMQ tests
+│   └── ClearPay.Operations.Tests/  # Operations service and cross-service tests
+├── mobile/clearpay/                # Flutter client (JWT), see its own README
+├── docs/                           # Screenshots, runbook, SQL plans
+├── scripts/sql/                    # Execution-plan measurement script
+├── docker-compose.yml              # Local SQL Server, Redis, RabbitMQ
+├── docker-compose.observability.yml # Collector, Tempo, Prometheus, Grafana, Seq
+├── .env.example                    # Placeholder values for docker compose
+└── .github/workflows/ci.yml        # .NET + Flutter CI
+```
+
+<a id="en-tests"></a>
+
+### Tests & CI
+
+#### Results (measured locally)
 
 | Suite | Command | Infrastructure | Result |
 |-------|---------|----------------|--------|
@@ -579,7 +737,7 @@ What the money tests cover:
 | Database CHECK constraint rejects zero-amount rows | `SqlServerLedgerTests` |
 | Architecture rules between layers | `ArchitectureTests` |
 
-### Run the tests
+#### Run the tests
 
 ```bash
 # Fast suite: SQLite only, no Docker needed (SQL Server and RabbitMQ tests are reported as skipped)
@@ -604,7 +762,7 @@ flutter pub get && flutter analyze && flutter test
 Each SQL Server test class creates its own database (`ClearPayTest_<random>`), applies the real
 EF migrations and drops it afterwards.
 
-### CI
+#### CI
 
 `.github/workflows/ci.yml` runs on pushes to `main` and on pull requests:
 
@@ -615,7 +773,9 @@ EF migrations and drops it afterwards.
 2. **Flutter job**: copy the Firebase options template, `flutter pub get`, `flutter analyze`,
    `flutter test`.
 
-## Installation
+<a id="en-install"></a>
+
+### Installation
 
 Prerequisites: .NET SDK 8 or newer, Docker (or SQL Server LocalDB on Windows), Flutter for the
 mobile client.
@@ -648,22 +808,25 @@ Notes:
   it is not set, no admin account is created; register normally instead.
 - Google, Apple and Firebase sign-in stay disabled until their settings are provided
   (`Authentication:Google:*`, `Authentication:Apple:*`, `Firebase:ProjectId`).
+- Run the Operations service as well for notifications and reconciliation: see [Operations Service](#en-operations).
 - Mobile client: see [`mobile/clearpay/README.md`](mobile/clearpay/README.md).
 
-## Demo Screenshots
+<a id="en-screenshots"></a>
 
-Wallet overview (balance derived from the ledger, last movements):
+### Demo Screenshots
 
-![Wallet overview](docs/assets/shot-ozet.png)
+| | |
+|---|---|
+| ![Wallet overview](docs/assets/shot-ozet.png) | ![Linked cards](docs/assets/shot-kartlar.png) |
+| Wallet overview: balance derived from the ledger, last movements · Cüzdan özeti: defterden türetilen bakiye, son hareketler | Linked cards: only last four digits, scheme and label are stored; the number shown is the standard Visa test number · Kartlarım: yalnızca son dört hane, şema ve etiket saklanır; görünen numara standart Visa test numarasıdır |
 
-Linked cards (only last four digits, scheme and label are stored; the number shown is the
-standard Visa test number):
+Both screenshots show the local Development seed account on a `.test` domain with the Turkish UI; no real personal data.
 
-![Linked cards](docs/assets/shot-kartlar.png)
+Observability screenshots are in [Observability](#en-observability).
 
-Both screenshots show the local Development seed account on a `.test` domain; no real personal data.
+<a id="en-security"></a>
 
-## Security Considerations
+### Security Considerations
 
 - **No secrets in the repository.** Connection strings, JWT signing key, OAuth and Firebase settings
   come from user-secrets or environment variables. `appsettings*.json` and `.env.example` contain
@@ -682,7 +845,9 @@ Both screenshots show the local Development seed account on a `.test` domain; no
   query string (standard for WebSockets, but it can appear in proxy logs), and there is no 2FA,
   KYC or AML.
 
-## Limitations
+<a id="en-limitations"></a>
+
+### Limitations
 
 - Portfolio demo. Not a licensed financial product; not audited; no real bank or card network
   integration (the gateway is simulated).
@@ -703,8 +868,12 @@ Both screenshots show the local Development seed account on a `.test` domain; no
 - Card refunds exist (`/api/payments/{id}/refunds`); wallet-to-wallet transfers cannot be refunded through the API or UI. There is no web UI for card payments yet (API and the fake ACS page only).
 - The fast test suite uses SQLite; SQL Server-specific behaviour (isolation, deadlocks,
   constraints) is covered only by the SQL Server tests.
+- Password-reset mail is only written to the log (`LogAccountMailer`); there is no real email delivery.
+- Not deployed; runs locally.
 
-## License
+<a id="en-license"></a>
+
+### License
 
 [MIT](LICENSE) (c) 2026 Halil Mert Develi.
 
@@ -713,3 +882,682 @@ Third-party components keep their own licences: vendored `anime.js` 3.2.2 (MIT) 
 font is loaded from Google Fonts (SIL Open Font License). NuGet and pub dependencies are restored
 from their registries and are MIT, Apache-2.0 or BSD licensed, except Hangfire (LGPL-3.0, used
 unmodified as a library).
+
+<p align="right"><a href="#english">Back to top</a> · <a href="#turkce">Türkçe</a></p>
+
+---
+
+<a id="turkce"></a>
+
+## Türkçe
+
+> **Portföy demosudur, bankacılık ürünü değildir.** ClearPay lisanslı bir banka, ödeme kuruluşu veya elektronik para kuruluşu değildir. Gerçek para hareketi yoktur: yükleme ve çekim için kullanılan banka gateway'i ve kart ödemelerindeki ödeme sağlayıcıları (PSP) ile 3-D Secure banka sayfası simüle edilmiştir. Tutarlar demo Türk lirasıdır (TRY). Arayüz varsayılan olarak Türkçedir; İngilizce, Almanca ve Fransızca da mevcuttur.
+
+- [Problem ve Çözüm](#tr-problem)
+- [Özellikler](#tr-features)
+- [Mimari](#tr-architecture)
+- [Gösterilen Bankacılık Kavramları](#tr-concepts)
+- [Çift Taraflı Defter](#tr-ledger)
+- [Idempotency](#tr-idempotency)
+- [Transaction Tutarlılığı](#tr-consistency)
+- [Kart Ödemeleri: 3-D Secure (simülasyon)](#tr-3ds)
+- [Kart Ödemeleri: PSP Adaptörleri, Tahsilat, İade, İptal](#tr-psp)
+- [Operations Servisi: Bildirimler ve Mutabakat](#tr-operations)
+- [Mesajlaşma: RabbitMQ Retry, Dead-Letter Queue, Inbox](#tr-messaging)
+- [T-SQL: Stored Procedure'ler, Covering Index'ler, Ölçülmüş Planlar](#tr-tsql)
+- [Gözlemlenebilirlik: Tek Ödeme, Tek Trace, İki Servis](#tr-observability)
+- [API Tasarımı](#tr-api)
+- [Teknoloji Yığını](#tr-stack)
+- [Depo Yapısı](#tr-structure)
+- [Testler ve CI](#tr-tests)
+- [Kurulum](#tr-install)
+- [Demo Ekran Görüntüleri](#tr-screenshots)
+- [Güvenlik Notları](#tr-security)
+- [Sınırlamalar](#tr-limitations)
+- [Lisans](#tr-license)
+
+<a id="tr-problem"></a>
+
+### Problem ve Çözüm
+
+**Problem.** Klasik cüzdan hatası `UPDATE Wallet SET Balance = Balance - @amount` ifadesidir. Geçmişi kaybeder, denetlenemez, mobil istemci zaman aşımından sonra isteği tekrarladığında iki kez para çeker ve süreç borç ile alacak arasında çökerse parayı yarı yolda bırakır.
+
+**Çözüm.** ClearPay bakiyeyi hiçbir zaman saklamaz. Her hareket, işaretli iki defter satırından (bir borç, bir alacak; toplamları sıfır) oluşan bir çifttir ve transfer kaydı, idempotency anahtarı, denetim (audit) satırı ve outbox mesajıyla birlikte **tek bir SQL Server transaction'ı** içinde yazılır. Bakiye, cüzdanın defter satırlarının toplamıdır. Aynı `Idempotency-Key` ile tekrarlanan istek **409 Conflict** döner ve hiçbir kayıt oluşturmaz.
+
+<a id="tr-features"></a>
+
+### Özellikler
+
+| Alan | Yetenek | Konum |
+|---|---|---|
+| Defter | Dengeli borç/alacak çiftleri, türetilmiş bakiye, eksi bakiye kontrolü, ters kayıt (iade) çifti | `src/ClearPay.Domain/Ledger/LedgerPair.cs` |
+| Transferler | Serializable transaction: defter çifti + transfer + idempotency anahtarı + audit + outbox | `src/ClearPay.Infrastructure/Persistence/SqlTransferExecutor.cs` |
+| Yükleme / çekim | Simüle banka gateway'i üzerinden hazine (takas) cüzdanına karşı çiftler | `SqlFundingExecutor.cs`, `src/ClearPay.Infrastructure/Banking/` |
+| 3-D Secure | Sahte ACS (banka) sayfası, iki yönde HMAC imzalı mesajlar, açık durum makinesi | `/api/3ds`, `/fake-acs`, `ThreeDsSigner` |
+| Kart ödemeleri | Tek PSP arayüzü arkasında üç sahte sağlayıcı; yetkilendirme, tahsilat, kısmi iade, iptal (idempotent) | `IPaymentServiceProvider`, `PspRouter`, `/api/payments` |
+| Mutabakat | Gece çalışan Hangfire job'ı, PSP settlement dosyalarını ayrı Operations servisinde eşleştirir | `src/ClearPay.Operations/` |
+| Idempotency | `Idempotency-Key` header'ı, primary key benzersizliği, SHA-256 istek parmak izi | `SqlIdempotencyStore.cs`, `src/ClearPay.Web/Controllers/TransfersController.cs` |
+| Outbox ve mesajlaşma | Commit edilmiş outbox satırları publisher confirms ile RabbitMQ'ya; retry, DLQ ve inbox ile tekilleştirme | `SqlOutboxProcessor.cs`, `src/ClearPay.Messaging/` |
+| T-SQL | Stored procedure'ler, covering index'ler, ölçülmüş execution plan'lar | `LedgerProcedures.sql`, `docs/sql/` |
+| Gözlemlenebilirlik | Serilog + OpenTelemetry; tek ödemenin iki servisteki tek trace'i | `src/ClearPay.ServiceDefaults/`, `docs/RUNBOOK-failed-payment.md` |
+| Dekontlar | Correlation id ile JSON ve üretilen PDF dekont | `ReceiptsController.cs`, `src/ClearPay.Infrastructure/Documents/SimplePdfReceiptRenderer.cs` |
+| Kimlik doğrulama | ASP.NET Identity (Razor için cookie), API/mobil için JWT, isteğe bağlı Google/Apple/Firebase | `src/ClearPay.Infrastructure/Identity/` |
+| Yönetim | Cüzdan dondurma/çözme, outbox görüntüleme ve yeniden kuyruğa alma, audit arama | `AdminApiController.cs`, `SqlAdminPanel.cs`, `Pages/Admin.cshtml` |
+| Bağlı kartlar | Yalnızca son dört hane, şema ve etiket saklanır | `CardsController.cs`, `src/ClearPay.Application/Funding/CardBindingParser.cs` |
+| Gerçek zamanlı | SignalR `/hubs/wallet` yalnızca yenileme sinyali gönderir, bakiye göndermez | `src/ClearPay.Web/Realtime/` |
+| Önbellek | İsteğe bağlı Redis cüzdan özeti önbelleği, commit sonrası geçersiz kılınır | `src/ClearPay.Infrastructure/Caching/` |
+| Web arayüzü | Razor Pages: özet, havale, kartlar, yükle/çek, hareketler, dekont, yönetim | `src/ClearPay.Web/Pages/` |
+| Yerelleştirme | `tr` (varsayılan), `en`, `de`, `fr` kaynakları | `src/ClearPay.Web/Localization/`, `src/ClearPay.Web/Resources/Localization/` |
+| Mobil | QR, PDF dekont paylaşımı ve SignalR yenilemesi olan Flutter JWT istemcisi | `mobile/clearpay/lib/` |
+
+<a id="tr-architecture"></a>
+
+### Mimari
+
+Defter host'u, bağımlılıkları tersine çevrilmiş (onion / clean) bir yapıdadır. Kurallar `ArchitectureTests` ile zorunlu kılınır (örneğin Domain hiçbir pakete referans vermez; Web sayfaları defter hesabı yapmaz ve gateway örneği oluşturmaz). Bildirimler ve mutabakat, kendi veritabanı olan ayrı bir serviste çalışır (bkz. [Operations Servisi](#tr-operations)).
+
+```mermaid
+flowchart LR
+    subgraph Clients
+        WEB["Razor Pages UI<br/>(cookie auth)"]
+        MOB["Flutter app<br/>(JWT)"]
+    end
+
+    subgraph Host["ClearPay.Web (ASP.NET Core 8, single host)"]
+        API["JSON API controllers<br/>/api/transfers, /api/topup, /api/withdraw,<br/>/api/wallet, /api/movements, /api/receipts"]
+        PAGES["Razor PageModels"]
+        HUB["SignalR /hubs/wallet<br/>(refresh hint only)"]
+        SWAG["Swagger /swagger"]
+    end
+
+    subgraph App["ClearPay.Application"]
+        PORTS["Ports: ITransferExecutor, IFundingExecutor,<br/>IWalletReader, IIdempotencyStore,<br/>IBankGateway, IOutboxPublisher"]
+    end
+
+    subgraph Dom["ClearPay.Domain"]
+        LEDGER["LedgerPair, LedgerEntry, Wallet,<br/>Transfer, IdempotencyRecord,<br/>AuditLog, OutboxMessage"]
+    end
+
+    subgraph Infra["ClearPay.Infrastructure"]
+        EXEC["SqlTransferExecutor /<br/>SqlFundingExecutor (EF Core)"]
+        GW["Rest/Soap BankGateway (simulated)"]
+        OUTBOX["Hangfire job -> SqlOutboxProcessor"]
+        CACHE["Redis wallet-summary cache"]
+        IDENT["ASP.NET Identity + JWT issuer"]
+    end
+
+    SQL[("SQL Server<br/>ledger + Identity")]
+    REDIS[("Redis (optional)")]
+    MQ[("RabbitMQ (optional)")]
+
+    WEB --> PAGES
+    MOB --> API
+    MOB -.-> HUB
+    PAGES --> PORTS
+    API --> PORTS
+    PORTS --> LEDGER
+    EXEC --> PORTS
+    EXEC --> SQL
+    EXEC --> GW
+    OUTBOX --> SQL
+    OUTBOX --> MQ
+    CACHE --> REDIS
+    IDENT --> SQL
+```
+
+<sub>Proje referanslarından ve `Program.cs` dosyasından çıkarılan defter host'unun düzeni ve çalışma zamanı bağımlılıkları.</sub>
+
+| Proje | İçerir | İçeremez |
+|---------|-------|---------------|
+| `ClearPay.Domain` | Defter tipleri ve para kuralları (`LedgerPair.Create`, `EnsureBalanced`, `NetOf`, `WouldGoNegative`) | EF, HTTP, paketler |
+| `ClearPay.Application` | Use-case sözleşmeleri (port'lar), komutlar/sonuçlar, FluentValidation | Connection string, EF |
+| `ClearPay.Infrastructure` | EF Core (SQL Server, testler için SQLite), Identity, JWT, Redis, RabbitMQ, Hangfire, gateway'ler | Razor, CSS |
+| `ClearPay.Web` | Composition root, controller'lar, Razor Pages, SignalR hub | Defter aritmetiği |
+| `ClearPay.Messaging` | Ortak yapı taşı: RabbitMQ topolojisi, retry / DLQ'lu tüketici host'u, inbox, trace header'ları | Domain tipleri, tablolar |
+| `ClearPay.ServiceDefaults` | İki host'un ortak kullandığı Serilog + OpenTelemetry kurulumu | İş kodu |
+| `ClearPay.Operations` | Ayrı servis: bildirimler + gece mutabakatı, kendi veritabanı (şema `ops`) | Defter host'una veya veritabanına herhangi bir referans |
+| `mobile/clearpay` | Flutter istemcisi (JWT); yerel bakiye tutmaz | Herhangi bir para mantığı |
+
+Redis ve RabbitMQ isteğe bağlıdır: Redis yoksa özet SQL'den okunur. `ConnectionStrings:RabbitMq` boşsa outbox olayları yalnızca log'a yazar; broker yapılandırılmış ama kapalıysa olaylar outbox'ta bekler ve broker geri geldiğinde yayınlanır. Tek doğruluk kaynağı SQL Server'dır.
+
+<a id="tr-concepts"></a>
+
+### Gösterilen Bankacılık Kavramları
+
+- **Çift taraflı kayıt**: her hareket, aynı `PairId` ve `CorrelationId` değerini paylaşan bir borç (`-tutar`) ve bir alacaktan (`+tutar`) oluşur.
+- **Türetilmiş bakiye**: `Wallet` üzerinde `Balance` sütunu yoktur; bakiye, cüzdanın işaretli kayıtlarının toplamıdır.
+- **Eksi bakiye yok**: defter neti sıfırın altına düşecekse borç reddedilir (kontrol transaction içinde yapılır).
+- **Idempotency**: `Idempotency-Key` header'ı, benzersiz index, istek parmak izi, tekrarda 409.
+- **Atomik kayıt**: defter çifti + transfer + idempotency anahtarı + audit + outbox birlikte commit edilir veya birlikte geri alınır.
+- **Transactional outbox**: entegrasyon olayları aynı transaction içinde satır olarak yazılır; bir arka plan job'ı bunları daha sonra yayınlar.
+- **Denetim izi**: her kayıt için kim, ne, ne zaman ve correlation id tutulur.
+- **Hesap dondurma**: dondurulmuş cüzdanlar para gönderemez veya çekemez (403); gelen alacaklar yine de kaydedilir.
+- **Takas hesabı**: yükleme ve çekimler bir hazine cüzdanına karşı çift olarak yazılır; böylece dışarıdan gelen para da defteri dengede tutar.
+- **Gateway zaman aşımı**: zaman aşımına uğrayan yükleme defter satırı oluşturmaz, bekleyen bir outbox satırı yazar ve 202 ile yanıtlanır; aynı anahtarla tekrar denemek çift alacak oluşturmaz.
+- **Ters kayıt modeli**: geçmiş hiçbir zaman düzenlenmez; kart iadeleri ters bir çift yazar (müşteri -> hazine), PSP'nin reddettiği iade çifti geri kaydeder (`/api/payments/{id}/refunds`). Cüzdandan cüzdana transferlerin hâlâ iade endpoint'i yoktur.
+- **3-D Secure (simülasyon)**: üye işyeri -> gateway -> sahte banka ACS sayfası -> HMAC imzalı callback; açık durum makinesi (`Initiated`, `Challenge`, `Authenticated`, `Failed`, `TimedOut`).
+- **Dekontlar**: her kayıt correlation id ile JSON veya üretilen PDF olarak alınabilir.
+
+<a id="tr-ledger"></a>
+
+### Çift Taraflı Defter
+
+```text
+Transfer of 25.00 from A to B, correlation C, pair P
+
+LedgerEntry  WalletId  Amount   PairId  CorrelationId  Kind
+-----------  --------  -------  ------  -------------  --------
+#1           A         -25.00   P       C              Transfer
+#2           B         +25.00   P       C              Transfer
+                       ------
+                         0.00   (every pair, and therefore the whole ledger, sums to zero)
+```
+
+- `LedgerPair.Create`, executor'ların kullandığı tek kayıt oluşturucusudur. Pozitif olmayan tutarları ve aynı cüzdanlar arası işlemi reddeder, sonuç üzerinde `EnsureBalanced` çağırır.
+- Veritabanı kendi korumasını ekler: `CK_LedgerEntry_Amount_NotZero`, `decimal(18,2)` tutarlar, silmeyi kısıtlayan (restrict) foreign key'ler ve `(WalletId, CreatedAt) INCLUDE (Amount, Kind, CorrelationId)` üzerinde bir covering index.
+- Bakiye = `SUM(Amount) WHERE WalletId = @wallet`. Cüzdan özetleri Redis'te önbelleğe alınabilir; ancak her commit sonrasında geçersiz kılınır ve hiçbir zaman SQL'e geri yazılmaz.
+
+Neden bakiye sütunu yok? Saklanan bakiye, kayıtlardan sapabilecek ikinci bir doğruluk kaynağıdır. Bakiyeyi türetmek "bakiye, kayıtların toplamıdır" kuralını yapısal olarak garanti eder; bedeli cüzdan satırları üzerinde bir okumadır ve demo ölçeğinde kabul edilebilirdir (bkz. [Sınırlamalar](#tr-limitations)).
+
+<a id="tr-idempotency"></a>
+
+### Idempotency
+
+`POST /api/transfers` bir `Idempotency-Key` header'ı gerektirir (en fazla 128 karakter).
+
+1. Transaction açılmadan önce anahtar aranır. Bulunursa orijinal `transferId` ve `correlationId` ile **409** döner; hiçbir şey yazılmaz.
+2. Transaction içinde anahtar tekrar aranır, ardından defter çiftiyle birlikte eklenir. Anahtar `IdempotencyRecord` tablosunun primary key'idir; bu nedenle yarışan iki istek birden commit edemez: kaybeden taraf unique violation alır ve 409 ile yanıtlanır.
+3. Kayıt; alıcı, tutar ve açıklamanın SHA-256 parmak izini saklar. Aynı anahtarın farklı bir gövdeyle kullanılması `KeyPayloadMismatch` (yine 409) olarak bildirilir ve asla borç oluşturmaz.
+
+Neden "önbellekteki yanıtla 200" yerine 409? İkisi de savunulabilir. 409, tekrarı istemciye açıkça bildirir ("zaten işlendi, tekrar ücret alınmadı") ve orijinal id'leri yine döndürür; böylece istemci mevcut dekontu açabilir. Yükleme ve çekim de kendi anahtar kapsamlarıyla aynı kuralları izler.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API as TransfersController
+    participant EX as SqlTransferExecutor
+    participant DB as SQL Server
+    C->>API: POST /api/transfers with Idempotency-Key K
+    API->>EX: TransferCommand, sender taken from JWT
+    EX->>DB: look up key K
+    alt key already stored
+        EX-->>API: Replay
+        API-->>C: 409 with original transferId
+    else new key
+        EX->>DB: BEGIN TRAN (Serializable)
+        EX->>DB: re-check K and overdraft
+        EX->>DB: insert ledger pair, transfer, key, audit, outbox
+        EX->>DB: COMMIT
+        EX-->>API: Posted
+        API-->>C: 201 with transferId and correlationId
+    end
+```
+
+<sub>`SqlTransferExecutor` akışına göre idempotency anahtarlı transfer isteği.</sub>
+
+<a id="tr-consistency"></a>
+
+### Transaction Tutarlılığı
+
+- Transfer ve yükleme/çekim işlemleri **Serializable** izolasyon seviyesinde tek bir EF Core transaction'ında çalışır. Eksi bakiye kontrolü gönderenin kayıtlarını bu transaction içinde okur; bu yüzden eşzamanlı iki borç eski bakiyeyi birlikte göremez.
+- Çekişme altında SQL Server bir deadlock kurbanı seçebilir. Bu durum **503 "hiçbir ücret alınmadı, tekrar deneyin"** olarak döner; istemci aynı anahtarla tekrar dener ve ya başarılı olur ya da 409 alır.
+- Commit öncesindeki her hata defter çiftini, transfer satırını, idempotency anahtarını, audit satırını ve outbox satırını birlikte geri alır; bu nedenle başarısız deneme anahtarı tüketmez.
+- Dış yan etkiler asla transaction içinde gerçekleşmez. Önbellek geçersiz kılma ve SignalR bildirimleri commit sonrasında çalışır; RabbitMQ yayını daha sonra outbox üzerinden yapılır. Yüklemelerde simüle banka çağrısı defter transaction'ından **önce** yapılır ve yalnızca başarılı yanıt kaydedilir.
+- Outbox worker'ı (Hangfire, dakikada bir) `Pending` satırları publisher confirms ile yayınlar; başarısız yayın satırı `Pending` bırakır (deneme sayacı artar), 5 başarısız denemeden sonra satır `Failed` olur ve admin API'sinden yeniden kuyruğa alınabilir. Teslimat en az bir kez (at-least-once) garantilidir; tüketiciler `MessageId` üzerinden inbox tablosuyla tekilleştirme yapar (bkz. [Mesajlaşma](#tr-messaging)).
+
+<a id="tr-3ds"></a>
+
+### Kart Ödemeleri: 3-D Secure (simülasyon)
+
+Kart ödemesinde para hareketinden önce kimlik doğrulama yapılır. Buradaki her şey simülasyondur: "banka", uygulamanın içinde çalışan **SimBank** adlı bir sayfadır; hiçbir kart ağına veya bankaya bağlanılmaz ve (test) kart numarasının yalnızca son dört hanesi saklanır.
+
+```mermaid
+sequenceDiagram
+    participant M as Merchant (app / API client)
+    participant G as Gateway (/api/3ds)
+    participant A as Fake ACS (/fake-acs, "SimBank")
+    M->>G: POST /api/3ds/sessions (JWT, Idempotency-Key, amount, test PAN)
+    G->>G: Luhn check, keep last 4, status Initiated -> Challenge
+    G-->>M: 201 { sessionId, status, acsUrl = /fake-acs?creq=<signed> }
+    M->>A: open acsUrl in a browser / web view
+    A->>A: verify CReq HMAC, show amount + card, ask OTP (demo: 123456)
+    A-->>M: auto-submitting form with the signed CRes
+    M->>G: POST /api/3ds/callback (form: sessionId, transStatus, eci, authValue, issuedAt, nonce, signature)
+    G->>G: verify HMAC + time window, compare-and-set Challenge -> Authenticated | Failed | TimedOut
+    G-->>M: 200 { status }
+```
+
+| Durum | Ne zaman |
+|-------|----------|
+| `Initiated` | Oturum satırı oluşturuldu (uzun süre görünmez; sahte directory server hemen karar verir) |
+| `Challenge` | Kart kayıtlı: kart sahibi ACS doğrulamasını yanıtlamalı |
+| `Authenticated` | ACS, doğrulama değeriyle `transStatus=Y` döndü (ECI 05) |
+| `Failed` | Yanlış OTP, kart sahibi iptal etti veya `...0002` test kartı (banka doğrulama sormadan reddeder) |
+| `TimedOut` | Süre dolmadan geçerli sonuç gelmedi (varsayılan 10 dakika); dakikada bir çalışan `clearpay-3ds-expiry` Hangfire job'ı veya okuma/callback sırasında işaretlenir |
+
+Callback'e nasıl güvenilir:
+
+- **İki yönde imzalı.** Gateway doğrulama isteğini (CReq), ACS de sonucu (CRes) her alan üzerinden HMAC-SHA256 ile imzalar (`ThreeDsSigner`). İki mesaj farklı önek kullanır; biri diğerinin yerine tekrar oynatılamaz. Karşılaştırma sabit zamanlıdır. Sahte veya değiştirilmiş sonuç **401** alır ve hiçbir şeyi değiştirmez.
+- **Tazelik.** `issuedAt` sunucu saatine göre 5 dakika içinde olmalıdır (aksi halde **400**).
+- **Tam olarak tek geçiş.** Durum değişikliği `UPDATE ... WHERE Id = @id AND Status = @expected` ile, audit satırı ve outbox olayıyla (`clearpay.3ds.authenticated`, `.failed`, `.timedout`) birlikte commit edilir. Aynı sonucun tarayıcıdan iki kez gönderilmesi 200 `AlreadyApplied` döner; bitmiş bir oturuma farklı sonuç **409**; süre dolduktan sonra gelen sonuç **410** döner ve oturum `TimedOut` olur. SQL Server testi sekiz çelişen callback'i paralel gönderir ve tam olarak bir geçiş ve bir outbox olayı olduğunu doğrular.
+- **Callback bilerek anonimdir.** Banka sayfasından tarayıcı tarafından gönderilir; JWT veya cookie taşımaz. Güven yalnızca imzadan ve durum makinesinden gelir.
+- **Anahtar.** `ThreeDs:AcsSharedSecret` (en az 32 bayt). Development herkese açık bir yer tutucuya düşer; diğer tüm ortamlarda anahtar yapılandırılana kadar 3-D Secure endpoint'leri hata verir (500).
+
+Kimlik doğrulama tek başına deftere hiçbir şey yazmaz; ödemenin tahsil edilmesi ayrı bir adımdır.
+
+<a id="tr-psp"></a>
+
+### Kart Ödemeleri: PSP Adaptörleri, Tahsilat, İade, İptal
+
+`Authenticated` durumdaki bir 3-D Secure oturumu tam olarak bir kart ödemesi için kullanılabilir ve bu ödeme müşterinin cüzdanına para yükler. Ödeme servisi sağlayıcılarla yalnızca `IPaymentServiceProvider` (authorize, capture, refund, void) üzerinden konuşur. Arkasında her biri farklı bir veri formatı kullanan üç sahte sağlayıcı vardır; böylece adaptör katmanı gerçek dönüştürme işi yapar:
+
+| Adaptör | Veri formatı (uygulama içinde simüle) | Belgelenmiş hata tetikleyicisi |
+|---------|---------------------------------------|--------------------------------|
+| `simbank-rest` (varsayılan) | JSON, ondalık metin, `APPROVED` / `DECLINED` | yetkilendirme `x.51` -> red `51`; iade `x.52` -> red `R52` |
+| `simbank-soap` | SOAP 1.1 XML zarfı, `ResponseCode` `00` = onay | yetkilendirme `x.05` -> red `05` |
+| `simpay` | kuruş cinsinden tamsayılar, `succeeded` / `failed` | `x.99` ile biten her tutar -> PSP işlemi yapar ama **yanıt kaybolur** (çağıran zaman aşımı görür) |
+
+Hiçbiri ağa bağlanmaz. Kendi "banka tarafı" kayıtları `sim.PspTransaction` tablosudur ve yalnızca simülatörler tarafından ayrı bir DbContext kapsamıyla yazılır; mutabakat için settlement dosyaları defterden değil buradan üretilir. Yeni bir sağlayıcı eklemek tek bir `IPaymentServiceProvider` kaydı demektir (`PspRouter` onu adıyla seçer).
+
+| İşlem | Deftere etkisi | Kural |
+|-------|----------------|-------|
+| Authorize (yetkilendirme) | yok | 3-D Secure oturumu `Authenticated`, çağırana ait ve kullanılmamış olmalı (compare-and-set ile alınır, benzersiz index `UX_CardPayment_ThreeDsSessionId`) |
+| Capture (tahsilat, oluşturmada varsayılan) | hazine -> müşteri, tür `CardPayment` | yalnızca PSP onayından sonra yazılır; ödeme başına bir kez |
+| Refund (tam veya kısmi iade) | müşteri -> hazine, tür `Refund` | iadelerin toplamı <= tahsil edilen tutar; cüzdanda tutar hâlâ bulunmalı; PSP reddederse ters çift yazılır |
+| Void (iptal) | yok | yalnızca tahsilattan önce |
+
+Bir işlemin uçtan uca idempotent olması:
+
+1. **SQL'de rezervasyon** (Serializable): `Idempotency-Key` + istek parmak izi, **deterministik sağlayıcı anahtarı** (`<paymentId>-auth`, `-capture`, `<operationId>-refund`) olan bir `PaymentOperation` satırı ve para kuralı (iadelerde cüzdan borcu burada yazılır; böylece yarışan iki iade kontrolü birlikte geçemez).
+2. **PSP çağrısı her transaction'ın dışında** bu sağlayıcı anahtarıyla yapılır. Her sahte PSP anahtarı saklar ve tekrara yeniden işlem yapmak yerine ilk sonucu döner.
+3. **Yanıt tek transaction'da kaydedilir**: işlem durumu, ödeme durumu, defter çifti, audit satırı ve outbox olayı (`clearpay.payment.authorized`, `.captured`, `.declined`, `.refunded`, `.refund_failed`, `.voided`).
+
+PSP zaman aşımı işlemi `Pending` bırakır ve **202** döner. Aynı `Idempotency-Key` ile tekrar denemek aynı sağlayıcı anahtarıyla işlemi tamamlar: `simpay` kayıp yanıt testi yetkilendirme ve tahsilatı bitirmek için üç çağrı yapar ve yine tek bir PSP yetkilendirmesi, tek bir PSP tahsilatı ve tek bir defter çiftiyle biter. Kurallar veritabanında CHECK kısıtlarıyla da korunur (`CK_CardPayment_Refund_LE_Captured`, `CK_CardPayment_Captured_LE_Amount`).
+
+<a id="tr-operations"></a>
+
+### Operations Servisi: Bildirimler ve Mutabakat (ayrı süreç)
+
+Bildirimler ve gece mutabakatı, **kendi veritabanı** (`ClearPayOps`, şema `ops`) olan ayrı bir ASP.NET Core servisinde, `src/ClearPay.Operations` içinde çalışır. Bu servis defter veritabanını hiçbir zaman açmaz (`ClearPay.Infrastructure`'a referans verirse veya `ClearPayDbContext`'ten bahsederse bir mimari testi build'i bozar); bildiği her şey RabbitMQ'dan veya PSP dosya klasöründen gelir. Bu adımdan önce defter host'unda hiç bildirim yoktu (yalnızca SignalR yenileme sinyalleri); bu yüzden bildirimler burada taşınmış değil yeni eklenmiştir. Mutabakat ise defter host'undan buraya taşınmıştır.
+
+```mermaid
+flowchart LR
+    subgraph Ledger["ClearPay.Web (ledger host, DB: ClearPay)"]
+        PAY["Card payments + fake PSPs"] --> OUT[("Outbox")]
+        PSP["PSP end-of-day job 01:00 UTC"]
+    end
+    OUT -->|"publisher confirms"| EX{{"clearpay.events (topic)"}}
+    PSP -->|"{provider}_{yyyyMMdd}.csv"| DROP[/"settlement drop folder"/]
+    EX -->|"clearpay.payment.operation.recorded"| PROJ["projection consumer"]
+    EX -->|"payment.captured / refunded / declined, 3ds.failed / timedout,<br/>reconciliation.completed"| NOTE["notification consumer"]
+    subgraph Ops["ClearPay.Operations (DB: ClearPayOps, schema ops)"]
+        PROJ --> P[("ops.PaymentOperation")]
+        NOTE --> N[("ops.Notification")]
+        JOB["Hangfire 02:30 UTC reconciliation"] --> P
+        JOB --> R[("ops.ReconciliationRun / Item")]
+    end
+    DROP --> JOB
+    JOB -->|"clearpay.reconciliation.completed"| EX
+```
+
+**Sınırdan ne geçer.** Defter, bir PSP işlemi oluşturulduğunda (`Pending`) veya yanıtlandığında (`Succeeded` / `Failed`) işlem satırıyla aynı transaction'da bir `clearpay.payment.operation.recorded` outbox olayı yazar. Operations servisi her işlemin son durumunu `ops.PaymentOperation` içinde tutar (inbox ile tekilleştirilir; geç gelen bir `Pending` görüntüsü son durumu asla ezmez). Simüle PSP'ler, sağlayıcı ve gün başına bir settlement CSV dosyasını `Reconciliation:SettlementDirectory` klasörüne bırakır (önce `.part` dosyasına yazılıp yeniden adlandırılır; okuyan taraf yarım dosya görmez). Bu, SFTP veya bucket teslimatının yerini tutar. İki servis yalnızca JWT ayarlarını (admin raporları) ve `src/ClearPay.Messaging` mesajlaşma yapı taşını (topoloji, tüketici host'u, inbox; domain tipi ve tablo yok) paylaşır.
+
+**Bildirimler.** Bir tüketici `payment.captured`, `refunded`, `refund_failed`, `declined`, `3ds.failed`, `3ds.timedout` ve `reconciliation.completed` olaylarını `ops.Notification` satırlarına dönüştürür (demo "posta kutusu"; `LogNotificationSender` yalnızca log yazar, e-posta, SMS veya push sağlayıcısı çağrılmaz). Inbox ve benzersiz `SourceMessageId` sayesinde yeniden teslim edilen bir olay asla iki kez bildirim üretmez; servisler arası RabbitMQ testi defter outbox'ını baştan yeniden yayınlar ve yine tek bildirim görür.
+
+**Mutabakat** (her gece 02:30 UTC, Hangfire job'ı `clearpay-ops-reconciliation-nightly`, **bir önceki gün** için; admin, Operations servisinde `POST /api/reconciliation/runs?date=yyyy-MM-dd` ile herhangi bir tarihi çalıştırabilir):
+
+1. Klasördeki **settlement dosyaları** (`SettlementCsv`; bozuk satırlar raporlanır, eksik dosya çalıştırma kaydına yazılır). Job'ın bulacağı bir şey olsun diye iki belgelenmiş hata vardır: `.77` ile biten tutarlar PSP dosyasına yazılmaz, `.78` ile biten tutarlar bir kuruş fazla settle edilir.
+2. **Bizim taraf**: projeksiyondaki o tarihe ait, başarısız olmamış Capture/Refund işlemleri (SQL Server'da `ops.usp_SettlementCandidates`).
+3. **Eşleştirme** (`ClearPay.Application` içindeki `ReconciliationEngine`, saf ve birim testli): önce sağlayıcı referansıyla, ardından PSP yanıtı kaybolduğu için referansı olmayan işlemler için tür + üye işyeri referansıyla.
+
+| Kalem türü | Anlamı | Operatör ne yapar |
+|------------|--------|-------------------|
+| `Matched` | aynı referans ve tutar | hiçbir şey |
+| `MissingInSettlement` | biz tahsil ettik/iade ettik, PSP settle etmedi | PSP'ye iletir |
+| `MissingInLedger` | PSP, kaydımız olmayan bir işlemi settle etti | araştırır; olası mükerrer veya yabancı işlem |
+| `AmountMismatch` | aynı referans, farklı tutar | PSP'ye iletir |
+| `PendingConfirmedBySettlement` | işlemimiz hâlâ `Pending` (zaman aşımı) ama PSP settle etmiş | tamamlar: aynı anahtarla tekrar dener |
+| `PendingNotInSettlement` | hâlâ `Pending` ve settle edilmemiş | büyük olasılıkla PSP'de hiç gerçekleşmedi |
+
+Her kalem saklanır, her uyuşmazlık sağlayıcı, referans ve tutarlarla birlikte uyarı olarak log'lanır ve çalıştırma `clearpay.reconciliation.completed` olayını yayınlar; bildirim tüketicisi bunu `operations-team` için bir rapora dönüştürür. Bu yayın commit sonrasında en iyi çabayla yapılır (doğruluk kaynağı saklanan çalıştırmadır; servisin kendi outbox'ı yoktur). Tamamlanmış çalıştırması olan bir tarih gece job'ı tarafından atlanır (Hangfire başarısız çalıştırmayı üç kez yeniden dener); elle başlatılan çalıştırma her zaman yeni bir çalıştırma oluşturur.
+
+Defter host'unun yanında yerelde çalıştırma:
+
+```bash
+dotnet ef database update --project src/ClearPay.Operations --connection "<ClearPayOps connection string>"   # veya başlangıçta migration'ı kendisi uygular
+dotnet run --project src/ClearPay.Operations --launch-profile http    # http://localhost:5163/health
+```
+
+İki serviste de `ConnectionStrings:Operations`, `ConnectionStrings:RabbitMq`, defter host'uyla aynı `Jwt:*` değerleri ve aynı `Reconciliation:SettlementDirectory` ayarlanmalıdır (varsayılan: işletim sisteminin temp klasörü altında `clearpay-settlements`).
+
+<a id="tr-messaging"></a>
+
+### Mesajlaşma: RabbitMQ Retry, Dead-Letter Queue, Inbox
+
+Outbox satırları `clearpay.events` topic exchange'ine yayınlanır (routing key = olay türü, `MessageId` = outbox satır id'si, kalıcı, **publisher confirms**). Broker yapılandırılmış ama erişilemiyorsa veya onay vermiyorsa publisher hata fırlatır: satır `Attempts + 1` ile `Pending` kalır ve toplu işlem durur; 5 başarısız denemeden sonra satır `Failed` olur ve admin yeniden kuyruğa alabilir. Mesajlaşmayı yalnızca boş bir `ConnectionStrings:RabbitMq` kapatır (satırlar bu durumda log'a yazılır).
+
+Her tüketicinin kendi kuyruk seti vardır ve `RabbitTopology` tarafından idempotent şekilde tanımlanır:
+
+```text
+clearpay.events (topic) --clearpay.payment.captured--> clearpay.cashback ----> handler
+                                                          |        ^
+                       exception, attempt n < max  -------+        | TTL expires, dead-letters back
+                                                          v        |
+                                     clearpay.cashback.retry.1 (1 s) / .retry.2 (5 s) / .retry.3 (25 s)
+                       attempts exhausted, or poison (reject) ---> clearpay.cashback.dlq  (x-last-error, x-death)
+```
+
+- **Backoff ile retry**: hata olursa tüketici mesajın `x-attempt` + 1 içeren bir kopyasını sonraki gecikme kuyruğuna yayınlar ve orijinali onaylar (ack); TTL dolunca broker mesajı geri yönlendirir. Varsayılanlar: 4 deneme, 1 sn / 5 sn / 25 sn gecikme (`Messaging:MaxAttempts`, `Messaging:RetryDelaysMs`).
+- **Dead-letter queue**: son denemeden sonra kopya, son hata `x-last-error` içinde olacak şekilde `<queue>.dlq` kuyruğuna gider; hiçbir zaman başarılı olamayacak bir mesaj (`PoisonMessageException`, eksik `MessageId`) yeniden kuyruğa alınmadan reddedilir ve broker onu hemen oraya yönlendirir.
+- **Tüketici idempotency'si (inbox)**: `InboxProcessor`, `InboxMessage (Consumer, MessageId)` satırını ve handler'ın değişikliklerini **tek transaction'da** ekler, ardından mesaj onaylanır. Yeniden teslim (outbox'ın tekrar yayını, commit ile ack arasında çökme sonrası broker teslimi veya retry) satırı bulur ve handler çalıştırılmadan onaylanır; yarışan iki teslim primary key'de çakışır ve kaybeden yan etkilerini geri alır.
+- **Bunu kanıtlayan, para yazan tüketici**: `CashbackOnCaptureHandler` (demo kampanya), tahsil edilen her kart ödemesinin %1'ini `clearpay-promotions` kesesinden müşteriye yatırır (defter türü `Cashback`). RabbitMQ testleri aynı mesajı iki kez yayınlar, tüketiciyi commit'ten sonra ama ack'ten önce çökertir, handler'ı başarılı olmadan önce iki kez başarısız yapar ve sonsuza dek başarısız yapar: cashback tam olarak bir kez yazılır (dead-letter'a giden mesaj için hiç yazılmaz).
+- **Bağlantı**: otomatik kurtarmalı, geç açılan tek uzun ömürlü bağlantı; böylece uygulama broker olmadan da başlar. `/api/health` anlık olarak `up`, `down` veya `off` bildirir.
+- **Trace bağlamı**: `traceparent` / `tracestate` AMQP header'larında taşınır ve tüketici kendi span'ını yayınlayanın span'ının çocuğu olarak başlatır (`ClearPay.Messaging` activity source).
+
+<a id="tr-tsql"></a>
+
+### T-SQL: Stored Procedure'ler, Covering Index'ler, Ölçülmüş Planlar
+
+Sık kullanılan okuma yolları eskiden bir cüzdanın tüm defter satırlarını uygulamaya çekip C# içinde toplayan EF sorgularıydı. SQL Server'da artık covering index'lerden yanıt veren stored procedure'ler çağrılır (hızlı testlerdeki SQLite eşdeğer LINQ'i korur; `LedgerSql` hangisinin kullanılacağını seçer).
+
+| Procedure | Kullanan | Aradığı index |
+|-----------|----------|---------------|
+| `dbo.usp_LedgerWalletBalance @WalletId` | transfer, çekim ve kart iadesindeki eksi bakiye kontrolü (çağıranın Serializable transaction'ı **içinde** çalışır) | `IX_LedgerEntry_WalletId_CreatedAt (WalletId, CreatedAt) INCLUDE (Amount, Kind, CorrelationId)` |
+| `dbo.usp_LedgerWalletSummary @WalletId, @MonthStart` | `/api/wallet` ve ana sayfa: bakiye, aylık giriş/çıkış, son 5 hareket tek seferde | aynı index (aggregate + geriye doğru `TOP (5)` aralık taraması, sıralama yok) |
+| `dbo.usp_PaymentSettlementCandidates @From, @To` (bir sonraki adıma kadar) | gece mutabakatı (bir günün tahsilat / iadeleri). Mutabakat Operations servisine taşınınca defterden kaldırıldı; servis kendi projeksiyonunda aynı yapıyı `ops.usp_SettlementCandidates` olarak kullanır | `IX_PaymentOperation_CreatedAt_Type (CreatedAt, Type) INCLUDE (...)`, artık `ops.PaymentOperation` üzerinde |
+
+Procedure'ler `src/ClearPay.Infrastructure/Persistence/Sql/LedgerProcedures.sql` içindedir ve `AddLedgerProceduresAndCoveringIndexes` EF migration'ı ile oluşturulur. Daha dar bir covering index, Serializable eksi bakiye kontrolünün aldığı key-range kilitlerini de daraltır.
+
+**Gerçek execution plan'lardan önce / sonra** (`scripts/sql/Measure-LedgerPlans.ps1`: sıfır veritabanı, tüm migration'lar, sentetik veri: ölçülen cüzdanda 100.000 olmak üzere 1.000.000 defter satırı ve 125.000 ödeme işlemi; Docker'da SQL Server 2022; ısınmış önbellek; 5 çalıştırmanın medyanı; okuma / CPU / süre değerleri plan XML'indeki `RunTimeCountersPerThread` ve `QueryTimeStats` alanlarından). "Önce", bu değişiklikten önce EF'in ürettiği sorgunun orijinal index üzerindeki halidir:
+
+| Sorgu | Önce: uygulamaya giden satır / logical read / süre | Sonra: satır / logical read / süre | Plan değişikliği |
+|-------|---------------------------------------------------|-------------------------------------|------------------|
+| Cüzdan bakiyesi (eksi bakiye kontrolü) | 100.000 / 288.087 / 162 ms | 1 / 963 / 10 ms | Index Seek + 100.000 Key Lookup (clustered seek) -> covering Index Seek + Stream Aggregate |
+| Cüzdan özeti | 100.000 / 288.087 / 203 ms | 6 / 966 / 22 ms | her sütun için aynı lookup'lar -> tek covering seek + index sırasına göre `TOP (5)` |
+| Mutabakat, bir gün (Operations ayrımından önce defter tablosunda ölçüldü) | 122.976 / 4.179 / 87 ms | 2.035 / 42 / 1 ms | Clustered Index Scan (tarih C#'ta filtreleniyordu) -> `CreatedAt` üzerinde aralık Index Seek |
+
+"Önce" süreleri yalnızca sunucu tarafıdır; 100.000 satırlık sonuç kümelerinin ayrıca ağdan geçmesi ve EF tarafından nesneye dönüştürülmesi gerekiyordu, "sonra" sürümleri bunu yapmaz. Tablonun tamamı ve `.sqlplan` dosyaları (SSMS / Azure Data Studio ile açılır) [`docs/sql`](docs/sql/plan-results.md) altındadır. Tekrar üretmek için:
+
+```powershell
+$env:CLEARPAY_BENCH_SA_PASSWORD = '<tek kullanımlık yerel container'ın sa şifresi>'
+./scripts/sql/Measure-LedgerPlans.ps1 -Server '127.0.0.1,14339'
+```
+
+<a id="tr-observability"></a>
+
+### Gözlemlenebilirlik: Tek Ödeme, Tek Trace, İki Servis
+
+İki host da `AddClearPayObservability` (`src/ClearPay.ServiceDefaults`) çağırır: **Serilog** yapılandırılmış log'ları konsola ve **Seq**'e yazar, her olay `TraceId` / `SpanId` ve `Service` taşır; **OpenTelemetry** trace ve metrikleri OTLP ile bir collector'a gönderir, collector bunları **Tempo** (Grafana), **Seq** (trace'ler log'ların yanında) ve **Prometheus**'a dağıtır. `Otel:Endpoint` / `Seq:Url` ayarlanmadıkça hiçbir şey dışarı gönderilmez; bu yüzden testler ve düz bir `dotnet run` collector gerektirmez.
+
+Trace asenkron adımlardan nasıl geçer:
+
+1. ASP.NET Core ve SqlClient enstrümantasyonu istek ve SQL span'larını oluşturur; `ClearPay.Payments` her PSP çağrısı için bir client span ekler (`psp simbank-rest authorize`) ve PSP reddettiğinde veya zaman aşımına uğradığında bunu red koduyla hata olarak işaretler.
+2. Her yeni outbox satırı isteğin W3C `traceparent` değerini saklar (`OutboxMessage.TraceParent`, `SaveChanges` içinde yazılır). Hangfire outbox job'ı bir dakikaya kadar sonra, ortam bağlamı olmadan çalışır; `outbox <event type>` span'ını **saklanan traceparent'ın çocuğu** olarak başlatır, böylece yayın orijinal trace'e katılır.
+3. `RabbitEventPublisher`, `traceparent` / `tracestate` değerlerini AMQP header'larına yazar; Operations servisindeki tüketici host'u `process` span'ını bunların çocuğu olarak başlatır; inbox ve projeksiyon SQL span'ları onun altına yerleşir. Retry'lar header'ları korur; yeniden denenen teslim aynı trace'te daha yüksek bir `messaging.rabbitmq.attempt` ile görünür.
+4. Her HTTP yanıtı bir `traceparent` header'ı, her hata yanıtı bir `traceId` taşır; destek ekibi istemcinin gördüğü yerden başlar.
+
+2026-11-09'da yerelde, aşağıdaki yığın ve demo verisiyle ölçüldü (250,00 TRY'lik bir kart ödemesi, 40,00'lık bir iade, PSP'nin `51` koduyla reddettiği bir ödeme, bir 3-D Secure reddi): tahsil edilen ödemenin trace'i **2 serviste 75 span** içeriyordu (istek, iki PSP çağrısı, SQL, 6 outbox yayını, RabbitMQ tüketicileri ve `ClearPayOps` içindeki SQL'leri); reddedilen ödemeninki 38 span. Özel metrikler `clearpay_psp_calls_total{provider,operation,outcome}` ve `clearpay_threeds_results_total{status}` Prometheus'taydı.
+
+Grafana'da (Tempo) reddedilen ödeme: 402 isteği, başarısız `psp simbank-rest authorize` span'ı ve 39 sn sonra aynı trace'teki outbox yayınları ile Operations servisinin tüketicileri:
+
+![Grafana Tempo'da reddedilen ödeme trace'i](docs/assets/observability/grafana-tempo-trace-declined.png)
+
+Aynı trace id Seq'te: iki servisin log olayları ve span'ları, `PSP Declined -> payment Declined` ve Operations servisinin `Notification card-payment-declined` kaydı dahil:
+
+![Seq'te reddedilen ödemenin log ve span'ları](docs/assets/observability/seq-logs-declined-payment.png)
+
+Tahsil edilen ödemenin tam trace'i [`docs/assets/observability/grafana-tempo-trace-captured.png`](docs/assets/observability/grafana-tempo-trace-captured.png) dosyasındadır. Bir ödeme başarısız olduğunda bunun nasıl kullanılacağı: [**Runbook: başarısız bir kart ödemesini izlemek**](docs/RUNBOOK-failed-payment.md) (İngilizce).
+
+```bash
+docker compose -f docker-compose.observability.yml up -d   # collector, Tempo, Prometheus, Grafana :3000, Seq :5341
+# ardından iki host'u da şu ayarlarla başlatın
+#   Otel__Endpoint=http://localhost:4317  Seq__Url=http://localhost:5341
+```
+
+Tüm gözlemlenebilirlik container'ları 127.0.0.1'e bağlanır ve kimlik doğrulamasız çalışır (Grafana anonim admin): yalnızca yerel demo içindir.
+
+<a id="tr-api"></a>
+
+### API Tasarımı
+
+JSON API, JWT bearer kimlik doğrulaması, `/swagger` adresinde OpenAPI dokümanı. Hatalar RFC 7807 `application/problem+json` formatındadır.
+
+| Metot | Yol | Notlar |
+|--------|------|-------|
+| POST | `/api/register` | Müşteri oluşturur, JWT döner (201) |
+| POST | `/api/token` | E-posta + şifre -> JWT (8 saat) |
+| POST | `/api/token/firebase` | Firebase ID token'ını JWT ile değiştirir (yalnızca Firebase yapılandırılmışsa) |
+| POST | `/api/password/forgot`, `/api/password/reset` | Şifre kurtarma (demo mailer log'a yazar) |
+| GET | `/api/wallet` | Bakiye (türetilmiş), aylık giriş/çıkış, son hareketler |
+| POST | `/api/transfers` | `Idempotency-Key` zorunlu. 201 / 400 / 401 / 403 dondurulmuş / 404 alıcı / 409 tekrar / 422 yetersiz bakiye / 503 tekrar denenebilir |
+| GET | `/api/transfers/{id}` | Yalnızca gönderen veya alıcı okuyabilir; diğerleri 404 alır |
+| POST | `/api/topup`, `/api/withdraw` | `Idempotency-Key` zorunlu; simüle gateway zaman aşımına uğrarsa 202 |
+| GET | `/api/movements` | Sayfalı (`page`, `pageSize` 1-50) |
+| GET | `/api/receipts/{correlationId}` (`/pdf`) | Yalnızca hareketin tarafları |
+| GET/POST | `/api/cards` | Bağlı kartlarda yalnızca son 4 hane, şema ve etiket saklanır (PAN ve CVV yok) |
+| POST | `/api/3ds/sessions` | `Idempotency-Key` zorunlu. Simüle 3-D Secure doğrulamasını başlatır; `acsUrl` ile 201, tekrarda 409 |
+| GET | `/api/3ds/sessions/{id}` | Oturum durumu; yalnızca sahibi (diğerleri 404) |
+| GET/POST | `/fake-acs?creq=...` | Sahte banka doğrulama sayfası (anonim, HTML) |
+| POST | `/api/3ds/callback` | İmzalı doğrulama sonucu (form post, anonim). 200 / 400 eski / 401 geçersiz imza / 409 / 410 süre doldu |
+| GET | `/api/payments/providers` | Kayıtlı PSP adaptörlerinin adları |
+| POST | `/api/payments` | `Idempotency-Key` zorunlu. `{ threeDsSessionId, provider?, capture? }`. 201 / 202 PSP zaman aşımı / 402 red / 409 tekrar veya 3DS zaten kullanılmış / 422 3DS doğrulanmamış |
+| POST | `/api/payments/{id}/capture`, `/void` | `Idempotency-Key` zorunlu. 200 / 202 / 402 / 409 / 422 yanlış durum |
+| POST | `/api/payments/{id}/refunds` | `Idempotency-Key` zorunlu. `{ amount }`, kısmi iade serbest. 200 / 202 / 402 red (defter ters kaydedilir) / 409 / 422 iade edilebilir tutarı veya cüzdan bakiyesini aşıyor |
+| GET | `/api/payments/{id}` | İşlemleriyle birlikte ödeme; yalnızca sahibi |
+| POST | `/api/admin/psp/settlement-files?date=yyyy-MM-dd` | `Admin` rolü: sahte PSP'ler o günün settlement dosyalarını hemen bırakır (aksi halde 01:00 UTC) |
+| GET | Operations servisi `/api/reconciliation/runs`, `/runs/{id}` | Defter host'unun verdiği `Admin` JWT'si: çalıştırma özetleri; tek bir çalıştırmanın eşleşen / eşleşmeyen tüm kalemleri |
+| POST | Operations servisi `/api/reconciliation/runs?date=yyyy-MM-dd` | `Admin`: bir iş gününü hemen mutabakata sokar (varsayılan dün, UTC) |
+| GET | Operations servisi `/api/notifications?recipient=` | `Admin`: demo posta kutusu |
+| GET/POST | `/api/admin/*` | `Admin` rolü: dondurma/çözme, outbox, audit arama |
+| GET | `/api/health` | Canlılık ve Redis/RabbitMQ durumu |
+
+Tasarım kararları:
+
+- **Borçlandırılan cüzdan hiçbir zaman istek alanı değildir.** Gönderen her zaman JWT'deki `NameIdentifier` claim'idir; `fromUserId` gibi ek gövde alanları yok sayılır (testlerle doğrulanır).
+- **Yabancılar 403 değil 404 alır**; böylece transfer ve dekont id'leri yoklanamaz.
+- **Durum kodları istemcinin uygulayabileceği anlam taşır**: 409 = zaten yapıldı, 422 = iş kuralı, 503 = aynı anahtarla güvenle tekrar denenebilir.
+- **İki kimlik doğrulama şeması, tek kullanıcı deposu**: Razor için cookie (antiforgery ile), API ve mobil için JWT; para API'si tarayıcı cookie'sini asla kabul etmez.
+
+<a id="tr-stack"></a>
+
+### Teknoloji Yığını
+
+| Alan | Seçim |
+|------|--------|
+| Çalışma zamanı | .NET 8 (C# 12), tek host içinde ASP.NET Core Razor Pages + Web API; ayrıca ASP.NET Core Operations servisi |
+| Veri | SQL Server 2022 (EF Core 8 migration'ları); hızlı entegrasyon testleri için SQLite |
+| Kimlik | ASP.NET Core Identity, JWT bearer, isteğe bağlı Google/Apple/Firebase girişi |
+| Doğrulama | FluentValidation |
+| Arka plan işleri | Hangfire: defter host'u (outbox, dakikada bir 3-D Secure süre kontrolü, 01:00'da PSP settlement dosyaları); Operations servisi (02:30'da mutabakat) |
+| Önbellek / mesajlaşma | Redis (StackExchange.Redis), RabbitMQ (RabbitMQ.Client: topic exchange, publisher confirms, TTL retry kuyrukları, DLQ, inbox), ikisi de isteğe bağlı |
+| Gerçek zamanlı | SignalR (yalnızca yenileme sinyali, asla bakiye değil) |
+| Dokümantasyon | Swashbuckle / OpenAPI |
+| Mobil | Flutter (Dart 3), `http`, `flutter_secure_storage`, `signalr_netcore`, Firebase Auth (isteğe bağlı) |
+| Gözlemlenebilirlik | Serilog (Seq sink), OpenTelemetry trace + metrik (OTLP -> collector -> Tempo, Prometheus, Seq), Grafana |
+| Testler | xUnit, FluentAssertions, `WebApplicationFactory`, Flutter widget testleri |
+| CI | SQL Server ve RabbitMQ service container'lı GitHub Actions |
+
+<a id="tr-structure"></a>
+
+### Depo Yapısı
+
+```text
+clearpay-ledger/
+├── src/
+│   ├── ClearPay.Domain/            # Defter varlıkları ve para kuralları, paket yok
+│   ├── ClearPay.Application/       # Port'lar, komutlar/sonuçlar, validator'lar, mutabakat motoru
+│   ├── ClearPay.Infrastructure/    # EF Core, migration'lar, Identity/JWT, gateway'ler, PSP'ler, outbox, önbellek
+│   ├── ClearPay.Messaging/         # RabbitMQ topolojisi, retry/DLQ'lu tüketici host'u, inbox
+│   ├── ClearPay.ServiceDefaults/   # Serilog + OpenTelemetry kurulumu
+│   ├── ClearPay.Operations/        # Ayrı servis: bildirimler + mutabakat, kendi veritabanı
+│   └── ClearPay.Web/               # Program.cs, API controller'ları, Razor Pages, SignalR hub
+├── tests/
+│   ├── ClearPay.Tests/             # xUnit birim, entegrasyon, mimari, SQL Server ve RabbitMQ testleri
+│   └── ClearPay.Operations.Tests/  # Operations servisi ve servisler arası testler
+├── mobile/clearpay/                # Flutter istemcisi (JWT), kendi README'si var
+├── docs/                           # Ekran görüntüleri, runbook, SQL planları
+├── scripts/sql/                    # Execution plan ölçüm scripti
+├── docker-compose.yml              # Yerel SQL Server, Redis, RabbitMQ
+├── docker-compose.observability.yml # Collector, Tempo, Prometheus, Grafana, Seq
+├── .env.example                    # docker compose için yer tutucu değerler
+└── .github/workflows/ci.yml        # .NET + Flutter CI
+```
+
+<a id="tr-tests"></a>
+
+### Testler ve CI
+
+#### Sonuçlar (yerelde ölçüldü)
+
+| Paket | Komut | Altyapı | Sonuç |
+|-------|---------|----------------|--------|
+| .NET, tam (2026-11-09) | `CLEARPAY_TEST_SQLSERVER` ve `CLEARPAY_TEST_RABBITMQ` tanımlıyken `tests/ClearPay.Tests` ve `tests/ClearPay.Operations.Tests` üzerinde `dotnet test` | SQLite dosyaları (testler oluşturur) + Docker'da SQL Server 2022 + RabbitMQ 3.13 | **281 başarılı, 0 başarısız, 0 atlanan** (271 + 10) |
+| .NET, hızlı (2026-11-09) | aynı komutlar, değişkenler tanımsız | yalnızca SQLite | 263 başarılı, 0 başarısız, 18 atlanan (defter 255 + 16 atlanan; Operations 8 + 2 atlanan) |
+| Flutter (2026-11-03) | `mobile/clearpay` içinde `flutter analyze` ve `flutter test` | yok (mock HTTP) | analyzer uyarısı yok; **20 başarılı, 0 başarısız** |
+| NuGet güvenlik açıkları | `dotnet list <project> package --vulnerable --include-transitive` | yok | güvenlik açığı olan paket yok |
+
+Sayılar, test çalıştırıcılarının raporladığı test vakalarıdır (xUnit theory'leri her veri satırı için bir kez sayılır).
+
+Para testlerinin kapsadıkları:
+
+| Konu | Konum |
+|---------|-------|
+| Borç = alacak, bakiye kayıtlardan türetilir, her çiftin toplamı sıfırdır | `LedgerPairTests`, `LedgerInvariantTests`, `LedgerSafetyApiTests.Ledger_stays_balanced...` |
+| Idempotent tekrar 409 döner ve kayıt oluşturmaz; aynı anahtar farklı gövdeyle | `TransferExecutorTests`, `TransferApiTests`, `LedgerSafetyApiTests.Errors_are_problem_details...` |
+| Eşzamanlı tekrar istekler (aynı anahtar, 8 paralel) tam olarak bir transfer oluşturur | `SqlServerLedgerTests` (SQL Server) |
+| Farklı anahtarlı eşzamanlı borçlar cüzdanı asla eksiye düşürmez | `SqlServerLedgerTests` (SQL Server) |
+| Satırlar gönderildikten sonra veritabanı hata verirse rollback; anahtar kullanılabilir kalır | `TransferRollbackTests` (SQLite), `SqlServerLedgerTests` (SQL Server) |
+| Yetersiz bakiye, dondurulmuş cüzdan, kendine transfer, bilinmeyen alıcı | `TransferExecutorTests`, `TransferApiTests`, `LedgerSafetyApiTests` |
+| Kimlik doğrulama: eksik, sahte ve süresi dolmuş JWT | `TransferApiTests`, `LedgerSafetyApiTests` |
+| Yetkilendirme: gövde borçlandırılacak cüzdanı seçemez; yabancılar transfer ve dekont okuyamaz | `LedgerSafetyApiTests`, `TransferApiTests` |
+| Doğrulama: tutar <= 0 veya 2'den fazla ondalık, bozuk JSON, aşırı uzun anahtar/açıklama | `LedgerSafetyApiTests`, `SqlServerLedgerTests` |
+| Audit satırı ve bekleyen outbox satırı defter correlation id'sini paylaşır; red durumunda yazılmaz | `LedgerSafetyApiTests` |
+| 3-D Secure: durum makinesi, imzalı CReq/CRes, sahte / eski / tekrar oynatılan callback'ler, süre dolumu, tam tarayıcı akışı | `ThreeDsServiceTests`, `ThreeDsDomainAndSignerTests`, `ThreeDsApiTests` |
+| 3-D Secure: 8 çelişen paralel callback tam olarak bir geçiş ve bir outbox olayı üretir | `ThreeDsSqlServerTests` (SQL Server) |
+| PSP adaptörleri: üçünde de yetkilendirme + tahsilat; redler kayıt oluşturmaz; tahsilattan önce iptal; kısmi iadeler sınırlı; iade reddi ters kaydedilir; kayıp PSP yanıtı çift kayıt olmadan tamamlanır; tekrar oynatılan anahtarlar | `CardPaymentServiceTests`, `CardPaymentApiTests` |
+| 100,00'lık bir ödemede on paralel 30,00 iade: tam olarak üçü başarılı; CHECK kısıtı fazla iadeyi reddeder | `CardPaymentSqlServerTests` (SQL Server) |
+| Mutabakat eşleştirme kuralları ve settlement CSV | `ReconciliationEngineTests` |
+| Operations servisi: defter veritabanına dokunmadan gerçek defter ödemeleri, olaylar ve PSP dosyalarından her uyuşmazlık türü; eksik dosya raporu; gece job'ı dünü hedefler; atlama / zorlama | `ReconciliationAcrossServicesTests` (Operations.Tests) |
+| Operations servisi: olay başına bir bildirim, operatör raporu, sırası karışık projeksiyon, zehirli olaylar, defterin JWT'siyle yalnızca admin API | `NotificationAndProjectionTests`, `OperationsApiTests` (Operations.Tests), `PspSimulatorAdminApiTests` |
+| Gerçek broker üzerinden iki host: defter outbox'ı -> RabbitMQ -> Operations projeksiyonu + bildirim; tam yeniden yayın tek bildirim üretir | `CrossServiceRabbitTests` (Operations.Tests, RabbitMQ) |
+| SQL Server'da Operations migration'ı ve `ops.usp_SettlementCandidates`; mimari: Operations deftere asla referans vermez | `OperationsSqlServerTests` (SQL Server), `ArchitectureTests` |
+| Tracing: outbox satırı isteğin traceparent'ını korur ve outbox yayını o trace'i sürdürür; AMQP header'ları bağlamı taşır | `TracingTests` |
+| Inbox: aynı mesaj iki kez gelse de bir kez yazılır; başarısız handler inbox satırını geri alır; zehirli içerik | `InboxProcessorTests` |
+| RabbitMQ: outbox'ın tekrar yayını ve ack öncesi çökme sonrası broker teslimi bir kez yazılır; retry'lar 200 / 400 ms bekleyip bir kez başarılı olur; tükenen retry'lar ve zehirli mesajlar DLQ'ya düşer | `RabbitMessagingTests` (RabbitMQ) |
+| Outbox: başarısız yayın deneme sınırına kadar `Pending` kalır, toplu işlem durur, mesaj id = satır id | `OutboxProcessorTests`, `RabbitOutboxPublisherTests` |
+| Stored procedure'ler yerini aldıkları LINQ ile aynı bakiye / özet / settlement satırlarını döner, çağıranın transaction'ına katılır ve covering index'ler migration sonrasında mevcuttur | `LedgerProcedureSqlServerTests` (SQL Server) |
+| Outbox worker'ı, gateway zaman aşımında outbox satırının korunması | `OutboxProcessorTests`, `FundingExecutorTests` |
+| Veritabanı CHECK kısıtı sıfır tutarlı satırları reddeder | `SqlServerLedgerTests` |
+| Katmanlar arası mimari kurallar | `ArchitectureTests` |
+
+#### Testleri çalıştırma
+
+```bash
+# Hızlı paket: yalnızca SQLite, Docker gerekmez (SQL Server ve RabbitMQ testleri atlanmış olarak raporlanır)
+dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release
+dotnet test tests/ClearPay.Operations.Tests/ClearPay.Operations.Tests.csproj -c Release
+
+# Tam paket: tek kullanımlık SQL Server ve RabbitMQ container'ları
+docker run -d --name clearpay-test-sql -e ACCEPT_EULA=Y -e "MSSQL_SA_PASSWORD=<local-password>" \
+  -p 127.0.0.1:14339:1433 mcr.microsoft.com/mssql/server:2022-latest
+export CLEARPAY_TEST_SQLSERVER="Server=127.0.0.1,14339;User Id=sa;Password=<local-password>;TrustServerCertificate=True;Encrypt=True"
+docker run -d --name clearpay-test-rabbit -p 127.0.0.1:25672:5672 rabbitmq:3.13-management-alpine
+export CLEARPAY_TEST_RABBITMQ="amqp://guest:guest@127.0.0.1:25672/"
+dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release
+dotnet test tests/ClearPay.Operations.Tests/ClearPay.Operations.Tests.csproj -c Release
+
+# Flutter
+cd mobile/clearpay
+cp firebase_options.template.dart lib/firebase_options.dart
+flutter pub get && flutter analyze && flutter test
+```
+
+Her SQL Server test sınıfı kendi veritabanını (`ClearPayTest_<random>`) oluşturur, gerçek EF migration'larını uygular ve sonunda veritabanını siler.
+
+#### CI
+
+`.github/workflows/ci.yml`, `main` dalına yapılan push'larda ve pull request'lerde çalışır:
+
+1. **.NET job'ı** (`mcr.microsoft.com/mssql/server:2022-latest` ve `rabbitmq:3.13-management-alpine` service container'ları ile): restore, build ve iki test projesinin testi (Release), `CLEARPAY_TEST_SQLSERVER` ve `CLEARPAY_TEST_RABBITMQ` tanımlıyken (eşzamanlılık, rollback ve mesajlaşma testleri gerçek sunuculara karşı çalışır), TRX sonuçlarını yükleme; `dotnet list package --vulnerable --include-transitive` herhangi bir bulgu raporlarsa job başarısız olur.
+2. **Flutter job'ı**: Firebase options şablonunu kopyalama, `flutter pub get`, `flutter analyze`, `flutter test`.
+
+<a id="tr-install"></a>
+
+### Kurulum
+
+Gereksinimler: .NET SDK 8 veya üzeri, Docker (ya da Windows'ta SQL Server LocalDB), mobil istemci için Flutter.
+
+```bash
+# 1. Altyapı (SQL Server, Redis, RabbitMQ)
+cp .env.example .env            # MSSQL_SA_PASSWORD değerini kendi yerel değerinizle değiştirin
+docker compose up -d
+
+# 2. Yerel gizli ayarlar (asla commit edilmez)
+dotnet user-secrets set "ConnectionStrings:ClearPay" \
+  "Server=localhost,1433;Database=ClearPay;User Id=sa;Password=<your MSSQL_SA_PASSWORD>;TrustServerCertificate=True;Encrypt=True" \
+  --project src/ClearPay.Web
+dotnet user-secrets set "Jwt:SigningKey" "<at least 32 random characters>" --project src/ClearPay.Web
+dotnet user-secrets set "ThreeDs:AcsSharedSecret" "<at least 32 random characters>" --project src/ClearPay.Web   # Development'ta isteğe bağlı
+dotnet user-secrets set "Seed:AdminPassword" "<password for the local admin account>" --project src/ClearPay.Web   # isteğe bağlı
+
+# 3. Çalıştırma (migration'lar başlangıçta uygulanır)
+dotnet run --project src/ClearPay.Web --launch-profile http
+# Web arayüzü: http://localhost:5153   Swagger: http://localhost:5153/swagger
+```
+
+Notlar:
+
+- `Development` ortamında `appsettings.Development.json` SQL Server LocalDB'yi (`(localdb)\MSSQLLocalDB`) kullanır; Windows'ta Docker'ı ve connection string secret'ını atlayabilirsiniz.
+- `Jwt:SigningKey` tanımlı değilse Development herkese açık bir yer tutucu anahtara düşer; diğer tüm ortamlar anahtar yapılandırılmadan başlamayı reddeder.
+- `Seed:AdminPassword` yalnızca Development ortamında `Admin` rolüne sahip `admin@clearpay.test` hesabını oluşturur. Tanımlı değilse admin hesabı oluşturulmaz; normal şekilde kayıt olun.
+- Google, Apple ve Firebase girişi ayarları verilene kadar kapalı kalır (`Authentication:Google:*`, `Authentication:Apple:*`, `Firebase:ProjectId`).
+- Bildirimler ve mutabakat için Operations servisini de çalıştırın: bkz. [Operations Servisi](#tr-operations).
+- Mobil istemci: [`mobile/clearpay/README.md`](mobile/clearpay/README.md) dosyasına bakın.
+
+<a id="tr-screenshots"></a>
+
+### Demo Ekran Görüntüleri
+
+| | |
+|---|---|
+| ![Cüzdan özeti](docs/assets/shot-ozet.png) | ![Kartlarım](docs/assets/shot-kartlar.png) |
+| Cüzdan özeti: defterden türetilen bakiye, son hareketler · Wallet overview: balance derived from the ledger, last movements | Kartlarım: yalnızca son dört hane, şema ve etiket saklanır; görünen numara standart Visa test numarasıdır · Linked cards: only last four digits, scheme and label are stored |
+
+İki ekran görüntüsü de Türkçe arayüzde, `.test` alan adındaki yerel Development seed hesabını gösterir; gerçek kişisel veri içermez. Gözlemlenebilirlik ekran görüntüleri [Gözlemlenebilirlik](#tr-observability) bölümündedir.
+
+<a id="tr-security"></a>
+
+### Güvenlik Notları
+
+- **Depoda gerçek gizli bilgi yoktur.** Connection string'ler, JWT imzalama anahtarı, 3-D Secure paylaşılan anahtarı, OAuth ve Firebase ayarları user-secrets veya ortam değişkenlerinden gelir. `appsettings*.json` ve `.env.example` yalnızca boş değerler veya yerel kullanım için yer tutucular içerir; CI workflow'u geçici container'ları için tek kullanımlık şifreler kullanır. Firebase istemci dosyaları `flutterfire configure` ile yerelde üretilir ve gitignore kapsamındadır.
+- **Yapısal yetkilendirme.** Borçlandırılan cüzdan istek gövdesinden değil token'dan gelir. Transferler, dekontlar, 3-D Secure oturumları ve ödemeler sahipleriyle sınırlıdır (diğerleri için 404). Admin endpoint'leri `Admin` rolü gerektirir.
+- **JWT**: HMAC-SHA256; issuer, audience, imza ve süre doğrulanır (1 dakika saat kayması toleransı); refresh token veya sunucu tarafı iptal olmadan 8 saatlik token'lar.
+- **Kart verisi**: yalnızca son dört hane, şema ve etiket saklanır; PAN ve CVV hiçbir zaman kalıcı olarak tutulmaz.
+- **Veri bütünlüğü** kodun yanı sıra veritabanı kısıtlarına da dayanır: benzersiz idempotency anahtarı, sıfır olmayan tutar CHECK kısıtı, iade ve tahsilat CHECK kısıtları, silmeyi kısıtlayan foreign key'ler.
+- **Demo ötesi için bilinen eksikler**: giriş kilitleme veya rate limiting yok, Swagger tüm ortamlarda açık, forwarded header'lara her proxy'den güveniliyor, SignalR JWT'yi query string'de taşıyor (WebSocket için standart, ancak proxy log'larında görünebilir); 2FA, KYC veya AML yok. Gözlemlenebilirlik container'ları kimlik doğrulamasız çalışır ve yalnızca yerel içindir.
+
+<a id="tr-limitations"></a>
+
+### Sınırlamalar
+
+- Portföy demosudur. Lisanslı bir finansal ürün değildir; denetlenmemiştir; gerçek banka veya kart ağı entegrasyonu yoktur (gateway, PSP'ler ve 3-D Secure bankası simüle edilmiştir).
+- Tek para birimi (TRY); kur çevrimi, ücret, faiz, hesap özeti, limit veya zamanlanmış ödeme yoktur.
+- Bakiye her kontrolde hâlâ cüzdanın tüm kayıtlarının toplamıdır (artık tek bir covering index seek: 100.000 satırlık bir cüzdan için yaklaşık 1.000 logical read; bkz. [T-SQL](#tr-tsql)). Üretim seviyesindeki bir defter, hesap başına bakiye snapshot'ları veya kilitli bir yürüyen bakiye ekler.
+- Serializable izolasyon eksi bakiye kontrolünü doğru tutar, ancak çekişmeyi deadlock tekrarlarına (503) dönüştürür. Gönderen hesabın satır seviyesinde kilitlenmesi daha iyi ölçeklenir.
+- Eşzamanlı tekrar yükleme istekleri, biri idempotency eklemesini kazanmadan önce simüle gateway'e ulaşabilir; defter yine yalnızca bir kez kayıt yapar. Gerçek bir entegrasyon anahtarı önce rezerve eder ve sağlayıcıya idempotency anahtarı olarak iletir.
+- Mutabakat, işlemleri PSP çağrısının başladığı UTC tarihine göre gruplar; gece yarısını aşan bir tekrar deneme iki tarafta farklı günlere düşüp iki uyuşmazlık olarak görünebilir. Settlement dosyaları SFTP yerine simülatörlerden yerel bir klasör üzerinden gelir; demoda iki servis de tek makinede çalışır.
+- Outbox worker'ı en az bir kez teslimat yapan tek bir Hangfire job'ıdır; birden fazla rekabet eden worker için tasarlanmamıştır.
+- Kart iadeleri vardır (`/api/payments/{id}/refunds`); cüzdandan cüzdana transferler API veya arayüz üzerinden iade edilemez. Kart ödemeleri için henüz web arayüzü yoktur (yalnızca API ve sahte ACS sayfası).
+- Şifre sıfırlama e-postası yalnızca log'a yazılır (`LogAccountMailer`); gerçek e-posta gönderimi yoktur.
+- Hızlı test paketi SQLite kullanır; SQL Server'a özgü davranışlar (izolasyon, deadlock, kısıtlar) yalnızca SQL Server testleriyle kapsanır.
+- Yayına alınmamıştır; yerelde çalışır.
+
+<a id="tr-license"></a>
+
+### Lisans
+
+[MIT](LICENSE) (c) 2026 Halil Mert Develi.
+
+Üçüncü taraf bileşenler kendi lisanslarını korur: `src/ClearPay.Web/wwwroot/js/vendor` altındaki `anime.js` 3.2.2 (MIT) ve `@microsoft/signalr` tarayıcı istemcisi (MIT); Inter yazı tipi Google Fonts üzerinden yüklenir (SIL Open Font License). NuGet ve pub bağımlılıkları kendi kayıt depolarından indirilir ve MIT, Apache-2.0 veya BSD lisanslıdır; Hangfire ise istisnadır (LGPL-3.0, kütüphane olarak değiştirilmeden kullanılır).
+
+<p align="right"><a href="#turkce">Başa dön</a> · <a href="#english">English</a></p>
