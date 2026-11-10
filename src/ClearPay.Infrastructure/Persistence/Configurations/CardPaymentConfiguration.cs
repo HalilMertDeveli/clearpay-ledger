@@ -48,42 +48,6 @@ internal sealed class PaymentOperationConfiguration : IEntityTypeConfiguration<P
         builder.HasIndex(x => new { x.Provider, x.ProviderIdempotencyKey }).IsUnique()
             .HasDatabaseName("UX_PaymentOperation_Provider_Key");
         builder.HasIndex(x => x.PaymentId).HasDatabaseName("IX_PaymentOperation_PaymentId");
-        // Nightly reconciliation reads one day of captures/refunds (dbo.usp_PaymentSettlementCandidates).
-        builder.HasIndex(x => new { x.CreatedAt, x.Type })
-            .HasDatabaseName("IX_PaymentOperation_CreatedAt_Type")
-            .IncludeProperties(x => new { x.Status, x.Provider, x.ProviderReference, x.CorrelationId, x.Amount });
-    }
-}
-
-internal sealed class ReconciliationRunConfiguration : IEntityTypeConfiguration<Domain.Reconciliation.ReconciliationRun>
-{
-    public void Configure(EntityTypeBuilder<Domain.Reconciliation.ReconciliationRun> builder)
-    {
-        builder.ToTable("ReconciliationRun");
-        builder.HasKey(x => x.Id);
-        builder.Property(x => x.Status).IsRequired().HasMaxLength(16);
-        builder.Property(x => x.LedgerTotal).HasPrecision(LedgerSchema.AmountPrecision, LedgerSchema.AmountScale);
-        builder.Property(x => x.SettlementTotal).HasPrecision(LedgerSchema.AmountPrecision, LedgerSchema.AmountScale);
-        builder.Property(x => x.Error).HasMaxLength(2000);
-        builder.HasIndex(x => new { x.BusinessDate, x.Status }).HasDatabaseName("IX_ReconciliationRun_BusinessDate_Status");
-    }
-}
-
-internal sealed class ReconciliationItemConfiguration : IEntityTypeConfiguration<Domain.Reconciliation.ReconciliationItem>
-{
-    public void Configure(EntityTypeBuilder<Domain.Reconciliation.ReconciliationItem> builder)
-    {
-        builder.ToTable("ReconciliationItem");
-        builder.HasKey(x => x.Id);
-        builder.Property(x => x.Kind).IsRequired().HasMaxLength(40);
-        builder.Property(x => x.Provider).IsRequired().HasMaxLength(32);
-        builder.Property(x => x.Type).IsRequired().HasMaxLength(16);
-        builder.Property(x => x.Reference).HasMaxLength(64);
-        builder.Property(x => x.LedgerAmount).HasPrecision(LedgerSchema.AmountPrecision, LedgerSchema.AmountScale);
-        builder.Property(x => x.SettlementAmount).HasPrecision(LedgerSchema.AmountPrecision, LedgerSchema.AmountScale);
-        builder.Property(x => x.Detail).HasMaxLength(400);
-        builder.HasOne<Domain.Reconciliation.ReconciliationRun>().WithMany().HasForeignKey(x => x.RunId).OnDelete(DeleteBehavior.Cascade);
-        builder.HasIndex(x => new { x.RunId, x.Kind }).HasDatabaseName("IX_ReconciliationItem_RunId_Kind");
     }
 }
 

@@ -1,3 +1,4 @@
+using ClearPay.Messaging;
 namespace ClearPay.Infrastructure.Messaging;
 
 /// <summary>Live broker state for /api/health.</summary>

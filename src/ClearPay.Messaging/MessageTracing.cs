@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 
-namespace ClearPay.Infrastructure.Messaging;
+namespace ClearPay.Messaging;
 
 /// <summary>
 /// W3C trace context over AMQP headers (<c>traceparent</c>, <c>tracestate</c>) and the activity source

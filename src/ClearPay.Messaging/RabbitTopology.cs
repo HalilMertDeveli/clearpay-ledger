@@ -1,6 +1,6 @@
 using RabbitMQ.Client;
 
-namespace ClearPay.Infrastructure.Messaging;
+namespace ClearPay.Messaging;
 
 /// <summary>
 /// Exchanges and queues, declared idempotently by publisher and consumers.

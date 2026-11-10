@@ -33,6 +33,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ClearPay.Application\ClearPay.Application.csproj" />
     <ProjectReference Include="..\ClearPay.Domain\ClearPay.Domain.csproj" />
+    <ProjectReference Include="..\ClearPay.Messaging\ClearPay.Messaging.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

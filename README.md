@@ -84,6 +84,8 @@ flowchart LR
 | `ClearPay.Application` | Use-case contracts (ports), commands/outcomes, FluentValidation | Connection strings, EF |
 | `ClearPay.Infrastructure` | EF Core (SQL Server, SQLite for tests), Identity, JWT, Redis, RabbitMQ, Hangfire, gateways | Razor, CSS |
 | `ClearPay.Web` | Composition root, controllers, Razor Pages, SignalR hub | Ledger arithmetic |
+| `ClearPay.Messaging` | Shared building block: RabbitMQ topology, consumer host with retry / DLQ, inbox, trace headers | Domain types, tables |
+| `ClearPay.Operations` | Separate service: notifications + nightly reconciliation, own database (schema `ops`) | Any reference to the ledger host or its database |
 | `mobile/clearpay` | Flutter client (JWT); no local balance | Any money logic |
 
 Redis and RabbitMQ are optional: without Redis the summary is read from SQL. With an empty
@@ -258,22 +260,62 @@ three calls to finish authorization and capture and still ends with one PSP auth
 PSP capture and one ledger pair. CHECK constraints back the rules in the database
 (`CK_CardPayment_Refund_LE_Captured`, `CK_CardPayment_Captured_LE_Amount`).
 
-## Nightly Reconciliation (Hangfire)
+## Operations Service: Notifications and Reconciliation (separate process)
 
-Every night at 02:30 UTC the Hangfire job `clearpay-reconciliation-nightly` reconciles
-**yesterday's** captures and refunds against each PSP's settlement file. An admin can run any date
-by hand (`POST /api/admin/reconciliation/runs?date=yyyy-MM-dd`).
+Notifications and the nightly reconciliation run in their own ASP.NET Core service,
+`src/ClearPay.Operations`, with **their own database** (`ClearPayOps`, schema `ops`). It never opens
+the ledger database (an architecture test fails the build if it references `ClearPay.Infrastructure`
+or mentions `ClearPayDbContext`); everything it knows arrives over RabbitMQ or from the PSP drop folder.
+Before this step the ledger host had no notifications at all (only SignalR refresh hints), so
+notifications are new here rather than moved; reconciliation was moved out of the ledger host.
 
-1. **Settlement files.** The fake PSPs play their end-of-day process: `SimSettlementFileSource`
-   writes `{provider}_{yyyyMMdd}.csv` (`provider,settlement_date,type,reference,merchant_ref,amount,currency`)
-   from their own journal into `Reconciliation:SettlementDirectory` and the job parses it
-   (`SettlementCsv`; malformed lines are reported, not skipped). Two documented faults give the job
-   something to find: amounts ending in `.77` are left out of the file, amounts ending in `.78`
-   are settled one kuruş higher.
-2. **Our side.** `PaymentOperation` rows of type Capture/Refund for that date that did not fail.
-3. **Matching** (`ReconciliationEngine`, pure and unit-tested): by provider reference, then - for
-   operations whose PSP response was lost and therefore have no reference - by type + merchant
-   reference.
+```mermaid
+flowchart LR
+    subgraph Ledger["ClearPay.Web (ledger host, DB: ClearPay)"]
+        PAY["Card payments + fake PSPs"] --> OUT[("Outbox")]
+        PSP["PSP end-of-day job 01:00 UTC"]
+    end
+    OUT -->|"publisher confirms"| EX{{"clearpay.events (topic)"}}
+    PSP -->|"{provider}_{yyyyMMdd}.csv"| DROP[/"settlement drop folder"/]
+    EX -->|"clearpay.payment.operation.recorded"| PROJ["projection consumer"]
+    EX -->|"payment.captured / refunded / declined, 3ds.failed / timedout,<br/>reconciliation.completed"| NOTE["notification consumer"]
+    subgraph Ops["ClearPay.Operations (DB: ClearPayOps, schema ops)"]
+        PROJ --> P[("ops.PaymentOperation")]
+        NOTE --> N[("ops.Notification")]
+        JOB["Hangfire 02:30 UTC reconciliation"] --> P
+        JOB --> R[("ops.ReconciliationRun / Item")]
+    end
+    DROP --> JOB
+    JOB -->|"clearpay.reconciliation.completed"| EX
+```
+
+**What crosses the boundary.** The ledger writes a `clearpay.payment.operation.recorded` outbox event
+whenever a PSP operation is created (`Pending`) or answered (`Succeeded` / `Failed`), in the same
+transaction as the operation row. The Operations service keeps the last state per operation in
+`ops.PaymentOperation` (inbox-deduplicated; a late `Pending` snapshot never overwrites a final one).
+The simulated PSPs drop one settlement CSV per provider and day into `Reconciliation:SettlementDirectory`
+(written to a `.part` file and renamed, so a reader never sees half a file) - the stand-in for an SFTP
+or bucket drop. Both services share only the JWT settings (admin reports) and the messaging building
+block `src/ClearPay.Messaging` (topology, consumer host, inbox; no domain types, no tables).
+
+**Notifications.** A consumer turns `payment.captured`, `refunded`, `refund_failed`, `declined`,
+`3ds.failed`, `3ds.timedout` and `reconciliation.completed` into rows in `ops.Notification` (the demo
+"mailbox"; `LogNotificationSender` only logs - no e-mail, SMS or push provider is called). The inbox
+plus a unique `SourceMessageId` mean a redelivered event never notifies twice; the cross-service
+RabbitMQ test re-publishes the whole ledger outbox and still sees one notification.
+
+**Reconciliation** (nightly at 02:30 UTC, Hangfire job `clearpay-ops-reconciliation-nightly`, for
+**yesterday**; an admin can run any date with `POST /api/reconciliation/runs?date=yyyy-MM-dd` on the
+Operations service):
+
+1. **Settlement files** from the drop folder (`SettlementCsv`; malformed lines are reported, a missing
+   file is recorded on the run). Two documented faults give the job something to find: amounts ending
+   in `.77` are left out of the PSP file, amounts ending in `.78` are settled one kuruş higher.
+2. **Our side**: the projection's Capture/Refund operations of that date that did not fail
+   (`ops.usp_SettlementCandidates` on SQL Server).
+3. **Matching** (`ReconciliationEngine` in `ClearPay.Application`, pure and unit-tested): by provider
+   reference, then - for operations whose PSP response was lost and therefore have no reference - by
+   type + merchant reference.
 
 | Item kind | Meaning | What an operator does |
 |-----------|---------|-----------------------|
@@ -284,11 +326,22 @@ by hand (`POST /api/admin/reconciliation/runs?date=yyyy-MM-dd`).
 | `PendingConfirmedBySettlement` | our operation is still `Pending` (timeout) but the PSP settled it | finish it: retry with the same key |
 | `PendingNotInSettlement` | still `Pending` and not settled | most likely never happened at the PSP |
 
-Every item is stored (`ReconciliationRun`, `ReconciliationItem`), each mismatch is logged as a
-warning with provider, reference and amounts, and the run publishes
-`clearpay.reconciliation.completed` (matched / mismatch counts, net totals) through the outbox.
-A date with a completed run is skipped by the nightly job (Hangfire may retry a failed run up to
-three times); a manual run always creates a new run.
+Every item is stored, each mismatch is logged as a warning with provider, reference and amounts, and
+the run publishes `clearpay.reconciliation.completed`, which the notification consumer turns into a
+report for `operations-team`. That publish is best effort after the commit (the stored run is the
+source of truth; the service has no outbox of its own). A date with a completed run is skipped by
+the nightly job (Hangfire retries a failed run up to three times); a manual run always creates a new run.
+
+Run it locally next to the ledger host:
+
+```bash
+dotnet ef database update --project src/ClearPay.Operations --connection "<ClearPayOps connection string>"   # or let it migrate on start
+dotnet run --project src/ClearPay.Operations --launch-profile http    # http://localhost:5163/health
+```
+
+Set `ConnectionStrings:Operations`, `ConnectionStrings:RabbitMq`, the same `Jwt:*` values as the
+ledger host, and the same `Reconciliation:SettlementDirectory` in both services (default: a
+`clearpay-settlements` folder under the OS temp directory).
 
 ## Messaging: RabbitMQ Retry, Dead-Letter Queue, Inbox
 
@@ -340,7 +393,7 @@ summed it in C#. On SQL Server they now call stored procedures that answer from 
 |-----------|---------|----------------|
 | `dbo.usp_LedgerWalletBalance @WalletId` | overdraft check in transfer, withdraw and card refund (runs **inside** the caller's Serializable transaction) | `IX_LedgerEntry_WalletId_CreatedAt (WalletId, CreatedAt) INCLUDE (Amount, Kind, CorrelationId)` |
 | `dbo.usp_LedgerWalletSummary @WalletId, @MonthStart` | `/api/wallet` and the home page: balance, month in/out, last 5 movements in one round trip | same index (aggregate + backward `TOP (5)` range scan, no sort) |
-| `dbo.usp_PaymentSettlementCandidates @From, @To` | nightly reconciliation (one day of captures / refunds) | `IX_PaymentOperation_CreatedAt_Type (CreatedAt, Type) INCLUDE (Status, Provider, ProviderReference, CorrelationId, Amount)` |
+| `dbo.usp_PaymentSettlementCandidates @From, @To` (until the next step) | nightly reconciliation (one day of captures / refunds). Dropped from the ledger when reconciliation moved to the Operations service, which uses the same shape as `ops.usp_SettlementCandidates` on its projection | `IX_PaymentOperation_CreatedAt_Type (CreatedAt, Type) INCLUDE (...)`, now on `ops.PaymentOperation` |
 
 The procedures live in `src/ClearPay.Infrastructure/Persistence/Sql/LedgerProcedures.sql` and are
 created by the EF migration `AddLedgerProceduresAndCoveringIndexes`. A narrower covering index also
@@ -356,7 +409,7 @@ reads / CPU / elapsed taken from `RunTimeCountersPerThread` and `QueryTimeStats`
 |-------|-----------------------------------------------|----------------------------------------|-------------|
 | Wallet balance (overdraft check) | 100,000 / 288,087 / 162 ms | 1 / 963 / 10 ms | Index Seek + 100,000 Key Lookups (clustered seeks) -> covering Index Seek + Stream Aggregate |
 | Wallet summary | 100,000 / 288,087 / 203 ms | 6 / 966 / 22 ms | same lookups for every column -> one covering seek + `TOP (5)` on the index order |
-| Reconciliation, one day | 122,976 / 4,179 / 87 ms | 2,035 / 42 / 1 ms | Clustered Index Scan (date filtered in C#) -> range Index Seek on `CreatedAt` |
+| Reconciliation, one day (measured on the ledger table before the Operations split) | 122,976 / 4,179 / 87 ms | 2,035 / 42 / 1 ms | Clustered Index Scan (date filtered in C#) -> range Index Seek on `CreatedAt` |
 
 "Before" elapsed times are server-side only; the 100,000-row result sets also had to cross the
 network and be materialised by EF, which the "after" versions avoid. The full table and the
@@ -394,8 +447,10 @@ JSON API, JWT bearer auth, OpenAPI document at `/swagger`. Errors use RFC 7807
 | POST | `/api/payments/{id}/capture`, `/void` | `Idempotency-Key` required. 200 / 202 / 402 / 409 / 422 wrong state |
 | POST | `/api/payments/{id}/refunds` | `Idempotency-Key` required. `{ amount }`, partial allowed. 200 / 202 / 402 declined (ledger reversed) / 409 / 422 exceeds refundable or insufficient wallet balance |
 | GET | `/api/payments/{id}` | Payment with its operations; owner only |
-| GET | `/api/admin/reconciliation/runs`, `/runs/{id}` | `Admin` role: run summaries; one run with every matched / mismatched item |
-| POST | `/api/admin/reconciliation/runs?date=yyyy-MM-dd` | `Admin` role: reconcile a business date now (default yesterday UTC) |
+| POST | `/api/admin/psp/settlement-files?date=yyyy-MM-dd` | `Admin` role: the fake PSPs drop that day's settlement files now (otherwise 01:00 UTC) |
+| GET | Operations service `/api/reconciliation/runs`, `/runs/{id}` | `Admin` JWT from the ledger host: run summaries; one run with every matched / mismatched item |
+| POST | Operations service `/api/reconciliation/runs?date=yyyy-MM-dd` | `Admin`: reconcile a business date now (default yesterday UTC) |
+| GET | Operations service `/api/notifications?recipient=` | `Admin`: the demo mailbox |
 | GET/POST | `/api/admin/*` | `Admin` role: freeze/unfreeze, outbox, audit search |
 | GET | `/api/health` | Liveness plus Redis/RabbitMQ status |
 
@@ -417,7 +472,7 @@ Design decisions:
 | Data | SQL Server 2022 (EF Core 8 migrations); SQLite for fast integration tests |
 | Identity | ASP.NET Core Identity, JWT bearer, optional Google/Apple/Firebase sign-in |
 | Validation | FluentValidation |
-| Background jobs | Hangfire (outbox processing, 3-D Secure expiry every minute, nightly reconciliation) |
+| Background jobs | Hangfire: ledger host (outbox, 3-D Secure expiry every minute, PSP settlement files 01:00); Operations service (reconciliation 02:30) |
 | Cache / messaging | Redis (StackExchange.Redis), RabbitMQ (RabbitMQ.Client: topic exchange, publisher confirms, TTL retry queues, DLQ, inbox), both optional |
 | Realtime | SignalR (refresh hints only, never balances) |
 | Docs | Swashbuckle / OpenAPI |
@@ -431,8 +486,8 @@ Design decisions:
 
 | Suite | Command | Infrastructure | Result |
 |-------|---------|----------------|--------|
-| .NET, full (2026-11-09) | `dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release` with `CLEARPAY_TEST_SQLSERVER` and `CLEARPAY_TEST_RABBITMQ` set | SQLite files (created by the tests) + SQL Server 2022 + RabbitMQ 3.13 in Docker | **270 passed, 0 failed, 0 skipped** |
-| .NET, fast (2026-11-09) | same command, variables unset | SQLite only | 253 passed, 0 failed, 17 skipped (12 SQL Server + 5 RabbitMQ tests) |
+| .NET, full (2026-11-09) | `dotnet test` on `tests/ClearPay.Tests` and `tests/ClearPay.Operations.Tests` with `CLEARPAY_TEST_SQLSERVER` and `CLEARPAY_TEST_RABBITMQ` set | SQLite files (created by the tests) + SQL Server 2022 + RabbitMQ 3.13 in Docker | **279 passed, 0 failed, 0 skipped** (269 + 10) |
+| .NET, fast (2026-11-09) | same commands, variables unset | SQLite only | 261 passed, 0 failed, 18 skipped (ledger 253 + 16 skipped; Operations 8 + 2 skipped) |
 | Flutter (2026-11-03) | `flutter analyze` and `flutter test` in `mobile/clearpay` | none (mocked HTTP) | no analyzer issues; **20 passed, 0 failed** |
 | NuGet vulnerabilities | `dotnet list <project> package --vulnerable --include-transitive` | none | no vulnerable packages |
 
@@ -456,7 +511,11 @@ What the money tests cover:
 | 3-D Secure: 8 conflicting callbacks in parallel give exactly one transition and one outbox event | `ThreeDsSqlServerTests` (SQL Server) |
 | PSP adapters: all three authorize + capture; declines post nothing; void before capture; partial refunds capped; refund decline reversed; lost PSP response resumed without double posting; replayed keys | `CardPaymentServiceTests`, `CardPaymentApiTests` |
 | Ten parallel 30.00 refunds on a 100.00 payment: exactly three succeed; CHECK constraint rejects over-refund | `CardPaymentSqlServerTests` (SQL Server) |
-| Reconciliation: every mismatch kind from real fake-PSP payments and real settlement files; nightly job targets yesterday and skips a finished date; admin-only API | `ReconciliationEngineTests`, `ReconciliationServiceTests`, `ReconciliationAdminApiTests` |
+| Reconciliation matching rules and settlement CSV | `ReconciliationEngineTests` |
+| Operations service: every mismatch kind from real ledger payments, events and PSP files without touching the ledger DB; missing file reported; nightly job targets yesterday; skip / force | `ReconciliationAcrossServicesTests` (Operations.Tests) |
+| Operations service: notifications once per event, operator report, out-of-order projection, poison events, admin-only API with the ledger's JWT | `NotificationAndProjectionTests`, `OperationsApiTests` (Operations.Tests), `PspSimulatorAdminApiTests` |
+| Two hosts over a real broker: ledger outbox -> RabbitMQ -> Operations projection + notification; full re-publish notifies once | `CrossServiceRabbitTests` (Operations.Tests, RabbitMQ) |
+| Operations migration and `ops.usp_SettlementCandidates` on SQL Server; architecture: Operations never references the ledger | `OperationsSqlServerTests` (SQL Server), `ArchitectureTests` |
 | Inbox: same message twice posts once; a failing handler rolls back its inbox row; poison payloads | `InboxProcessorTests` |
 | RabbitMQ: outbox re-publish and broker redelivery after a crash before ack post once; retries wait 200 / 400 ms then succeed once; exhausted retries and poison messages land in the DLQ | `RabbitMessagingTests` (RabbitMQ) |
 | Outbox: failed publish stays Pending until the attempt limit, batch stops, message id = row id | `OutboxProcessorTests`, `RabbitOutboxPublisherTests` |
@@ -470,6 +529,7 @@ What the money tests cover:
 ```bash
 # Fast suite: SQLite only, no Docker needed (SQL Server and RabbitMQ tests are reported as skipped)
 dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release
+dotnet test tests/ClearPay.Operations.Tests/ClearPay.Operations.Tests.csproj -c Release
 
 # Full suite: throw-away SQL Server and RabbitMQ containers
 docker run -d --name clearpay-test-sql -e ACCEPT_EULA=Y -e "MSSQL_SA_PASSWORD=<local-password>" \
@@ -478,6 +538,7 @@ export CLEARPAY_TEST_SQLSERVER="Server=127.0.0.1,14339;User Id=sa;Password=<loca
 docker run -d --name clearpay-test-rabbit -p 127.0.0.1:25672:5672 rabbitmq:3.13-management-alpine
 export CLEARPAY_TEST_RABBITMQ="amqp://guest:guest@127.0.0.1:25672/"
 dotnet test tests/ClearPay.Tests/ClearPay.Tests.csproj -c Release
+dotnet test tests/ClearPay.Operations.Tests/ClearPay.Operations.Tests.csproj -c Release
 
 # Flutter
 cd mobile/clearpay
@@ -493,7 +554,7 @@ EF migrations and drops it afterwards.
 `.github/workflows/ci.yml` runs on pushes to `main` and on pull requests:
 
 1. **.NET job** with `mcr.microsoft.com/mssql/server:2022-latest` and `rabbitmq:3.13-management-alpine` service containers: restore,
-   build (Release), test with `CLEARPAY_TEST_SQLSERVER` and `CLEARPAY_TEST_RABBITMQ` set (so the concurrency, rollback and messaging tests
+   build and test both test projects (Release) with `CLEARPAY_TEST_SQLSERVER` and `CLEARPAY_TEST_RABBITMQ` set (so the concurrency, rollback and messaging tests
    run against real servers), upload TRX results, then fail the job if
    `dotnet list package --vulnerable --include-transitive` reports anything.
 2. **Flutter job**: copy the Firebase options template, `flutter pub get`, `flutter analyze`,
@@ -581,7 +642,7 @@ Both screenshots show the local Development seed account on a `.test` domain; no
   key first and pass it to the provider as its idempotency key.
 - Reconciliation buckets operations by the UTC date their PSP call started; an operation retried across
   midnight can land on different dates on each side and show up as two mismatches. Settlement files
-  come from the in-process simulators, not from an SFTP drop.
+  come from the simulators via a local folder, not from an SFTP drop; both services run on one machine in the demo.
 - The outbox worker is a single Hangfire job with at-least-once delivery; it is not designed for
   multiple competing workers.
 - Card refunds exist (`/api/payments/{id}/refunds`); wallet-to-wallet transfers cannot be refunded through the API or UI. There is no web UI for card payments yet (API and the fake ACS page only).

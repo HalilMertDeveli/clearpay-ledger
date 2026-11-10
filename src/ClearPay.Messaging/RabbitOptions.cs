@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Configuration;
 
-namespace ClearPay.Infrastructure.Messaging;
+namespace ClearPay.Messaging;
 
 /// <summary>Messaging settings (section <c>Messaging</c>); the broker URI is <c>ConnectionStrings:RabbitMq</c>.</summary>
 public sealed class RabbitOptions

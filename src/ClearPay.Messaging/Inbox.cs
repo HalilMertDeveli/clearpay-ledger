@@ -1,8 +1,8 @@
-using ClearPay.Infrastructure.Persistence;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace ClearPay.Infrastructure.Messaging;
+namespace ClearPay.Messaging;
 
 /// <summary>"This consumer already handled this message." Primary key (Consumer, MessageId).</summary>
 public sealed class InboxMessage
@@ -72,7 +72,7 @@ public sealed class InboxProcessor<TContext>
         {
             await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (DbUpdateException ex) when (UniqueConstraint.IsDuplicateKey(ex))
+        catch (DbUpdateException ex) when (IsDuplicateKey(ex))
         {
             await tx.RollbackAsync(cancellationToken).ConfigureAwait(false);
             _db.ChangeTracker.Clear();
@@ -83,5 +83,13 @@ public sealed class InboxProcessor<TContext>
         await tx.CommitAsync(cancellationToken).ConfigureAwait(false);
         _db.ChangeTracker.Clear();
         return true;
+    }
+
+    /// <summary>Provider-neutral: SQL Server "duplicate key" (2627/2601) and SQLite "UNIQUE constraint failed".</summary>
+    private static bool IsDuplicateKey(DbUpdateException ex)
+    {
+        var message = ex.InnerException?.Message ?? ex.Message;
+        return message.Contains("duplicate key", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("UNIQUE constraint", StringComparison.OrdinalIgnoreCase);
     }
 }
