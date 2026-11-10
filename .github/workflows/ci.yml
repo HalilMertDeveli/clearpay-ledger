@@ -21,6 +21,7 @@ jobs:
       MSSQL_SA_PASSWORD: CI_Only_Throwaway_Pa55!
       DOTNET_NOLOGO: "true"
       TEST_PROJECT: tests/ClearPay.Tests/ClearPay.Tests.csproj
+      OPS_TEST_PROJECT: tests/ClearPay.Operations.Tests/ClearPay.Operations.Tests.csproj
     services:
       mssql:
         image: mcr.microsoft.com/mssql/server:2022-latest
@@ -35,6 +36,15 @@ jobs:
           --health-timeout 5s
           --health-retries 12
           --health-start-period 20s
+      rabbitmq:
+        image: rabbitmq:3.13-management-alpine
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v5
 
@@ -43,18 +53,24 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Restore
-        run: dotnet restore "$TEST_PROJECT"
+        run: |
+          dotnet restore "$TEST_PROJECT"
+          dotnet restore "$OPS_TEST_PROJECT"
 
       - name: Build
-        run: dotnet build "$TEST_PROJECT" --no-restore --configuration Release
+        run: |
+          dotnet build "$TEST_PROJECT" --no-restore --configuration Release
+          dotnet build "$OPS_TEST_PROJECT" --no-restore --configuration Release
 
-      - name: Test (SQLite integration + SQL Server integration)
+      - name: Test (SQLite integration + SQL Server + RabbitMQ integration)
         env:
+          # Enables the [RabbitFact] tests (redelivery, retry with backoff, dead-letter queue) against the service container.
+          CLEARPAY_TEST_RABBITMQ: amqp://guest:guest@localhost:5672/
           # Enables the [SqlServerFact] tests (concurrency, rollback, constraints) against the service container.
           CLEARPAY_TEST_SQLSERVER: Server=localhost,1433;User Id=sa;Password=${{ env.MSSQL_SA_PASSWORD }};TrustServerCertificate=True;Encrypt=True
-        run: >-
-          dotnet test "$TEST_PROJECT" --no-build --configuration Release
-          --logger "trx;LogFileName=results.trx" --results-directory TestResults
+        run: |
+          dotnet test "$TEST_PROJECT" --no-build --configuration Release --logger "trx;LogFileName=results.trx" --results-directory TestResults
+          dotnet test "$OPS_TEST_PROJECT" --no-build --configuration Release --logger "trx;LogFileName=operations.trx" --results-directory TestResults
 
       - name: Upload test results
         if: always()
@@ -68,7 +84,7 @@ jobs:
         run: |
           set -euo pipefail
           : > vulnerable.txt
-          for project in src/*/*.csproj "$TEST_PROJECT"; do
+          for project in src/*/*.csproj "$TEST_PROJECT" "$OPS_TEST_PROJECT"; do
             dotnet list "$project" package --vulnerable --include-transitive | tee -a vulnerable.txt
           done
           if grep -q "has the following vulnerable packages" vulnerable.txt; then

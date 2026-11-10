@@ -1,0 +1,110 @@
+<ShowPlanXML xmlns="http://schemas.microsoft.com/sqlserver/2004/07/showplan" Version="1.564" Build="16.0.4305.5">
+  <BatchSequence>
+    <Batch>
+      <Statements>
+        <StmtSimple StatementText="SELECT TOP (5) e.CreatedAt, e.Kind, e.Amount, e.CorrelationId&#xD;&#xA;    FROM dbo.LedgerEntry AS e&#xD;&#xA;    WHERE e.WalletId = @WalletId&#xD;&#xA;    ORDER BY e.CreatedAt DESC" StatementId="2" StatementCompId="5" StatementType="SELECT" StatementSqlHandle="0x0900E2E6EA8046964BF247C882D77FD857600000000000000000000000000000000000000000000000000000" DatabaseContextSettingsId="2" ParentObjectId="1621580815" StatementParameterizationType="0" RetrievedFromCache="true" StatementSubTreeCost="0.00331623" StatementEstRows="5" SecurityPolicyApplied="false" StatementOptmLevel="TRIVIAL" QueryHash="0x41C5283A99E10EDE" QueryPlanHash="0x80C637D66547B292" CardinalityEstimationModelVersion="160">
+          <StatementSetOptions QUOTED_IDENTIFIER="true" ARITHABORT="false" CONCAT_NULL_YIELDS_NULL="true" ANSI_NULLS="true" ANSI_PADDING="true" ANSI_WARNINGS="true" NUMERIC_ROUNDABORT="false">
+          </StatementSetOptions>
+          <QueryPlan DegreeOfParallelism="1" CachedPlanSize="24" CompileTime="0" CompileCPU="0" CompileMemory="216">
+            <MemoryGrantInfo SerialRequiredMemory="0" SerialDesiredMemory="0" GrantedMemory="0" MaxUsedMemory="0">
+            </MemoryGrantInfo>
+            <OptimizerHardwareDependentProperties EstimatedAvailableMemoryGrant="64327" EstimatedPagesCached="80409" EstimatedAvailableDegreeOfParallelism="10" MaxCompileMemory="8552472">
+            </OptimizerHardwareDependentProperties>
+            <OptimizerStatsUsage>
+              <StatisticsInfo LastUpdate="2026-11-09T13:07:22.03" ModificationCount="0" SamplingPercent="100" Statistics="[IX_LedgerEntry_WalletId_CreatedAt]" Table="[LedgerEntry]" Schema="[dbo]" Database="[ClearPayPlanBenchmark]">
+              </StatisticsInfo>
+            </OptimizerStatsUsage>
+            <QueryTimeStats ElapsedTime="0" CpuTime="0">
+            </QueryTimeStats>
+            <RelOp NodeId="0" PhysicalOp="Top" LogicalOp="Top" EstimateRows="5" EstimateIO="0" EstimateCPU="5e-07" AvgRowSize="46" EstimatedTotalSubtreeCost="0.00331623" Parallel="0" EstimateRebinds="0" EstimateRewinds="0" EstimatedExecutionMode="Row">
+              <OutputList>
+                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Amount">
+                </ColumnReference>
+                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="CorrelationId">
+                </ColumnReference>
+                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Kind">
+                </ColumnReference>
+                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="CreatedAt">
+                </ColumnReference>
+              </OutputList>
+              <RunTimeInformation>
+                <RunTimeCountersPerThread Thread="0" ActualRows="5" Batches="0" ActualElapsedms="0" ActualCPUms="0" ActualEndOfScans="1" ActualExecutions="1" ActualExecutionMode="Row">
+                </RunTimeCountersPerThread>
+              </RunTimeInformation>
+              <Top RowCount="0" IsPercent="0" WithTies="0">
+                <TopExpression>
+                  <ScalarOperator ScalarString="(5)">
+                    <Const ConstValue="(5)">
+                    </Const>
+                  </ScalarOperator>
+                </TopExpression>
+                <RelOp NodeId="1" PhysicalOp="Index Seek" LogicalOp="Index Seek" EstimateRows="5" EstimateRowsWithoutRowGoal="100000" EstimatedRowsRead="100000" EstimateIO="0.708755" EstimateCPU="0.110157" AvgRowSize="46" EstimatedTotalSubtreeCost="0.00331573" TableCardinality="1e+06" Parallel="0" EstimateRebinds="0" EstimateRewinds="0" EstimatedExecutionMode="Row">
+                  <OutputList>
+                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Amount">
+                    </ColumnReference>
+                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="CorrelationId">
+                    </ColumnReference>
+                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Kind">
+                    </ColumnReference>
+                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="CreatedAt">
+                    </ColumnReference>
+                  </OutputList>
+                  <RunTimeInformation>
+                    <RunTimeCountersPerThread Thread="0" ActualRows="5" Batches="0" ActualElapsedms="0" ActualCPUms="0" ActualScans="1" ActualLogicalReads="3" ActualPhysicalReads="0" ActualReadAheads="0" ActualLobLogicalReads="0" ActualLobPhysicalReads="0" ActualLobReadAheads="0" ActualRowsRead="5" ActualEndOfScans="0" ActualExecutions="1" ActualExecutionMode="Row">
+                    </RunTimeCountersPerThread>
+                  </RunTimeInformation>
+                  <IndexScan Ordered="1" ScanDirection="BACKWARD" ForcedIndex="0" ForceSeek="0" ForceScan="0" NoExpandHint="0" Storage="RowStore">
+                    <DefinedValues>
+                      <DefinedValue>
+                        <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Amount">
+                        </ColumnReference>
+                      </DefinedValue>
+                      <DefinedValue>
+                        <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="CorrelationId">
+                        </ColumnReference>
+                      </DefinedValue>
+                      <DefinedValue>
+                        <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Kind">
+                        </ColumnReference>
+                      </DefinedValue>
+                      <DefinedValue>
+                        <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="CreatedAt">
+                        </ColumnReference>
+                      </DefinedValue>
+                    </DefinedValues>
+                    <Object Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Index="[IX_LedgerEntry_WalletId_CreatedAt]" Alias="[e]" IndexKind="NonClustered" Storage="RowStore">
+                    </Object>
+                    <SeekPredicates>
+                      <SeekPredicateNew>
+                        <SeekKeys>
+                          <Prefix ScanType="EQ">
+                            <RangeColumns>
+                              <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="WalletId">
+                              </ColumnReference>
+                            </RangeColumns>
+                            <RangeExpressions>
+                              <ScalarOperator ScalarString="[@WalletId]">
+                                <Identifier>
+                                  <ColumnReference Column="@WalletId">
+                                  </ColumnReference>
+                                </Identifier>
+                              </ScalarOperator>
+                            </RangeExpressions>
+                          </Prefix>
+                        </SeekKeys>
+                      </SeekPredicateNew>
+                    </SeekPredicates>
+                  </IndexScan>
+                </RelOp>
+              </Top>
+            </RelOp>
+            <ParameterList>
+              <ColumnReference Column="@WalletId" ParameterDataType="uniqueidentifier" ParameterCompiledValue="{guid'11111111-1111-1111-1111-111111111111'}" ParameterRuntimeValue="{guid'11111111-1111-1111-1111-111111111111'}">
+              </ColumnReference>
+            </ParameterList>
+          </QueryPlan>
+        </StmtSimple>
+      </Statements>
+    </Batch>
+  </BatchSequence>
+</ShowPlanXML>

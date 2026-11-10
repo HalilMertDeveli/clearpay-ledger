@@ -1,9 +1,13 @@
+using ClearPay.Messaging;
 namespace ClearPay.Infrastructure.Messaging;
 
+/// <summary>Live broker state for /api/health.</summary>
 public sealed class RabbitRuntimeStatus
 {
-    public RabbitRuntimeStatus(string value) => Value = value;
+    private readonly RabbitConnectionProvider _connections;
+
+    public RabbitRuntimeStatus(RabbitConnectionProvider connections) => _connections = connections;
 
     /// <summary>up, down, or off (no connection string).</summary>
-    public string Value { get; }
+    public string Value => _connections.Status;
 }

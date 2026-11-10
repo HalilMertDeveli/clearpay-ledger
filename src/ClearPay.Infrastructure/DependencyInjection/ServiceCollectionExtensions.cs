@@ -1,3 +1,4 @@
+using ClearPay.Messaging;
 using ClearPay.Application.Ports;
 using ClearPay.Infrastructure.Banking;
 using ClearPay.Infrastructure.Caching;
@@ -5,6 +6,11 @@ using ClearPay.Infrastructure.Identity;
 using ClearPay.Infrastructure.Documents;
 using ClearPay.Infrastructure.Jobs;
 using ClearPay.Infrastructure.Messaging;
+using ClearPay.Infrastructure.Messaging.Handlers;
+using ClearPay.Application.Payments;
+using ClearPay.Infrastructure.Payments;
+using ClearPay.Infrastructure.Payments.Psp;
+using Microsoft.Extensions.Hosting;
 using ClearPay.Infrastructure.Persistence;
 using ClearPay.Infrastructure.Realtime;
 using ClearPay.Infrastructure.Time;
@@ -15,7 +21,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using RabbitMQ.Client;
+
 using StackExchange.Redis;
 
 namespace ClearPay.Infrastructure.DependencyInjection;
@@ -66,6 +72,24 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAdminPanel, SqlAdminPanel>();
         services.AddScoped<IOutboxProcessor, SqlOutboxProcessor>();
         services.AddScoped<OutboxHangfireJob>();
+
+        services.AddSingleton(sp => ThreeDsOptions.From(
+            sp.GetRequiredService<IConfiguration>(),
+            sp.GetRequiredService<IHostEnvironment>()));
+        services.AddScoped<IThreeDsService, SqlThreeDsService>();
+        services.AddSingleton<IFakeAcs, FakeAcs>();
+        services.AddScoped<ThreeDsExpiryHangfireJob>();
+
+        // Fake PSPs: adding one is a new IPaymentServiceProvider registration, nothing else.
+        services.AddSingleton<SimulatedPspCore>();
+        services.AddSingleton<IPaymentServiceProvider, SimBankRestPsp>();
+        services.AddSingleton<IPaymentServiceProvider, SimBankSoapPsp>();
+        services.AddSingleton<IPaymentServiceProvider, SimPayPsp>();
+        services.AddSingleton<IPspRouter, PspRouter>();
+        services.AddScoped<ICardPaymentService, SqlCardPaymentService>();
+
+        services.AddSingleton<IPspSettlementFileWriter, SimSettlementFileWriter>();
+        services.AddScoped<PspSettlementFilesHangfireJob>();
 
         services.AddScoped<RestBankGateway>();
         services.AddScoped<SoapBankGateway>();
@@ -136,6 +160,16 @@ public static class ServiceCollectionExtensions
                 "clearpay-outbox",
                 job => job.Run(),
                 Cron.Minutely);
+
+            manager.AddOrUpdate<ThreeDsExpiryHangfireJob>(
+                "clearpay-3ds-expiry",
+                job => job.Run(),
+                Cron.Minutely);
+
+            manager.AddOrUpdate<PspSettlementFilesHangfireJob>(
+                "clearpay-psp-settlement-files",
+                job => job.Run(),
+                Cron.Daily(1, 0));
         }
         catch (Exception)
         {
@@ -159,21 +193,22 @@ public static class ServiceCollectionExtensions
 
     private static void AddRabbit(IServiceCollection services, IConfiguration configuration)
     {
+        var options = RabbitOptions.From(configuration);
+        services.AddSingleton(options);
+        services.AddSingleton<RabbitConnectionProvider>();
+        services.AddSingleton<RabbitRuntimeStatus>();
+        services.AddSingleton<RabbitEventPublisher>();
         services.AddSingleton<LoggingOutboxPublisher>();
-        var connection = RabbitConnectionFactory.TryCreate(configuration.GetConnectionString("RabbitMq"));
-        if (connection is null)
-        {
-            var empty = configuration.GetConnectionString("RabbitMq");
-            services.AddSingleton(new RabbitRuntimeStatus(string.IsNullOrWhiteSpace(empty) ? "off" : "down"));
-            services.AddScoped<IOutboxPublisher>(sp => sp.GetRequiredService<LoggingOutboxPublisher>());
-            return;
-        }
+        if (options.Enabled)
+            services.AddSingleton<IOutboxPublisher, RabbitOutboxPublisher>();
+        else
+            services.AddSingleton<IOutboxPublisher>(sp => sp.GetRequiredService<LoggingOutboxPublisher>());
 
-        services.AddSingleton(connection);
-        services.AddSingleton(new RabbitRuntimeStatus("up"));
-        services.AddSingleton<IOutboxPublisher>(sp => new RabbitOutboxPublisher(
-            sp.GetRequiredService<IConnection>(),
-            sp.GetRequiredService<ILogger<RabbitOutboxPublisher>>(),
-            sp.GetRequiredService<LoggingOutboxPublisher>()));
+        // Consumers in this host (the ledger owner). Each handler = one queue with retry + dead-letter queues.
+        services.AddScoped(typeof(InboxProcessor<>));
+        services.AddScoped<CashbackOnCaptureHandler>();
+        services.AddSingleton(new MessageHandlerRegistry().Add<CashbackOnCaptureHandler>());
+        services.AddSingleton<RabbitConsumerService>();
+        services.AddHostedService(sp => sp.GetRequiredService<RabbitConsumerService>());
     }
 }

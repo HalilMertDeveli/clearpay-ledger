@@ -1,74 +1,25 @@
-using System.Text;
 using ClearPay.Application.Ports;
-using Microsoft.Extensions.Logging;
-using RabbitMQ.Client;
+using ClearPay.Messaging;
 
 namespace ClearPay.Infrastructure.Messaging;
 
+/// <summary>
+/// Outbox -> RabbitMQ. MessageId = outbox row id, so a re-published row is recognised by consumers'
+/// inboxes. Throws when the broker is unreachable or does not confirm, so the outbox keeps the row.
+/// </summary>
 public sealed class RabbitOutboxPublisher : IOutboxPublisher
 {
-    public const string QueueName = "clearpay.outbox";
+    private readonly RabbitEventPublisher _publisher;
 
-    private readonly IConnection? _connection;
-    private readonly ILogger<RabbitOutboxPublisher> _logger;
-    private readonly LoggingOutboxPublisher _fallback;
-
-    public RabbitOutboxPublisher(
-        IConnection? connection,
-        ILogger<RabbitOutboxPublisher> logger,
-        LoggingOutboxPublisher fallback)
+    public RabbitOutboxPublisher(RabbitEventPublisher publisher)
     {
-        _connection = connection;
-        _logger = logger;
-        _fallback = fallback;
+        _publisher = publisher;
     }
 
-    public Task PublishAsync(string type, string payload, Guid correlationId, CancellationToken cancellationToken = default)
+    public Task PublishAsync(Guid messageId, string type, string payload, Guid correlationId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (_connection is null || !_connection.IsOpen)
-        {
-            return _fallback.PublishAsync(type, payload, correlationId, cancellationToken);
-        }
-
-        try
-        {
-            using var channel = _connection.CreateModel();
-            channel.QueueDeclare(QueueName, durable: true, exclusive: false, autoDelete: false);
-            var body = Encoding.UTF8.GetBytes(payload ?? string.Empty);
-            var props = channel.CreateBasicProperties();
-            props.Persistent = true;
-            props.Type = type;
-            props.CorrelationId = correlationId.ToString();
-            channel.BasicPublish(exchange: string.Empty, routingKey: QueueName, basicProperties: props, body: body);
-            return Task.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Rabbit publish failed; falling back to log publisher.");
-            return _fallback.PublishAsync(type, payload, correlationId, cancellationToken);
-        }
-    }
-}
-
-internal static class RabbitConnectionFactory
-{
-    public static IConnection? TryCreate(string? amqp)
-    {
-        if (string.IsNullOrWhiteSpace(amqp))
-            return null;
-        try
-        {
-            var factory = new ConnectionFactory
-            {
-                Uri = new Uri(amqp),
-                RequestedConnectionTimeout = TimeSpan.FromSeconds(2)
-            };
-            return factory.CreateConnection("clearpay");
-        }
-        catch (Exception)
-        {
-            return null;
-        }
+        _publisher.Publish(messageId, type, payload, correlationId);
+        return Task.CompletedTask;
     }
 }

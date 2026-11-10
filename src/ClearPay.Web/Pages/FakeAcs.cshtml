@@ -1,0 +1,68 @@
+@page "/fake-acs"
+@model FakeAcsModel
+@{
+    Layout = null;
+    var c = Model.ChallengeData!;
+    var r = Model.Result;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>SimBank 3-D Secure (demo)</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #eef1f5; margin: 0; padding: 24px 16px; color: #1c2430; }
+        .acs { max-width: 380px; margin: 0 auto; background: #fff; border-radius: 10px; padding: 24px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+        .bank { font-weight: 700; letter-spacing: .04em; color: #0b4f8a; }
+        .demo { background: #fff4d6; border: 1px solid #f0c64a; border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+        dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; }
+        dt { color: #5a6573; } dd { margin: 0; font-weight: 600; }
+        input[type=text] { width: 100%; box-sizing: border-box; font-size: 20px; padding: 8px; letter-spacing: .3em; }
+        .row { display: flex; gap: 8px; margin-top: 12px; }
+        button { flex: 1; padding: 10px; font-size: 15px; border-radius: 6px; border: 0; cursor: pointer; }
+        .primary { background: #0b4f8a; color: #fff; } .secondary { background: #dde3ea; }
+    </style>
+</head>
+<body>
+<main class="acs">
+    <p class="bank">SimBank · 3-D Secure</p>
+    <p class="demo">Demo issuer page. No real bank is involved. The one-time code is <strong>@ClearPay.Application.Payments.ThreeDsTestCards.DemoOtp</strong>.</p>
+    <dl>
+        <dt>Merchant</dt><dd>ClearPay (demo)</dd>
+        <dt>Amount</dt><dd>@c.Amount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture) TRY</dd>
+        <dt>Card</dt><dd>•••• @c.CardLast4</dd>
+        <dt>Expires</dt><dd>@c.ExpiresAt.ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) UTC</dd>
+    </dl>
+
+    @if (r is null)
+    {
+        <form method="post">
+            <input type="hidden" asp-for="Creq" />
+            <label for="otp">One-time code sent to your phone</label>
+            <input id="otp" type="text" asp-for="Otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" autofocus />
+            <div class="row">
+                <button class="secondary" type="submit" name="action" value="cancel">Cancel</button>
+                <button class="primary" type="submit" name="action" value="submit">Confirm</button>
+            </div>
+        </form>
+    }
+    else
+    {
+        <p>@(r.TransStatus == "Y" ? "Authenticated. Returning to the merchant…" : "Not authenticated. Returning to the merchant…")</p>
+        <form id="cres" method="post" action="/api/3ds/callback">
+            <input type="hidden" name="sessionId" value="@r.SessionId" />
+            <input type="hidden" name="transStatus" value="@r.TransStatus" />
+            <input type="hidden" name="eci" value="@(r.Eci ?? string.Empty)" />
+            <input type="hidden" name="authenticationValue" value="@(r.AuthenticationValue ?? string.Empty)" />
+            <input type="hidden" name="issuedAt" value="@r.IssuedAtUnix" />
+            <input type="hidden" name="nonce" value="@r.Nonce" />
+            <input type="hidden" name="signature" value="@r.Signature" />
+            <noscript><button class="primary" type="submit">Continue</button></noscript>
+        </form>
+        <script>document.getElementById('cres').submit();</script>
+    }
+</main>
+</body>
+</html>

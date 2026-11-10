@@ -14,6 +14,8 @@ internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outb
             .IsRequired()
             .HasMaxLength(128);
         builder.Property(m => m.Payload).IsRequired();
+        builder.Property(m => m.LastError).HasMaxLength(400);
+        builder.Property(m => m.TraceParent).HasMaxLength(64);
         builder.Property(m => m.CorrelationId).IsRequired();
         builder.Property(m => m.OccurredAt).IsRequired();
         builder.Property(m => m.Status).IsRequired();

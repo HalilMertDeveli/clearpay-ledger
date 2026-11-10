@@ -37,7 +37,8 @@ public sealed class ArchitectureTests
     public void Web_references_application_and_infrastructure_not_domain_directly()
     {
         var refs = ProjectRefs("src", "ClearPay.Web", "ClearPay.Web.csproj");
-        refs.Should().HaveCount(2);
+        refs.Should().HaveCount(3);
+        refs.Should().Contain(r => r.Contains("ClearPay.ServiceDefaults", StringComparison.Ordinal));
         refs.Should().Contain(r => r.Contains("ClearPay.Application", StringComparison.Ordinal));
         refs.Should().Contain(r => r.Contains("ClearPay.Infrastructure", StringComparison.Ordinal));
         refs.Should().NotContain(r => r.Contains("ClearPay.Domain", StringComparison.Ordinal));
@@ -84,6 +85,30 @@ public sealed class ArchitectureTests
         var domain = Path.Combine(Root, "src", "ClearPay.Domain");
         Directory.EnumerateFiles(domain, "*.dart", SearchOption.AllDirectories).Should().BeEmpty();
         File.ReadAllText(Path.Combine(Root, "ClearPay.slnx")).Should().NotContain("mobile");
+    }
+
+    [Fact]
+    public void Operations_service_never_touches_the_ledger_host_or_its_database()
+    {
+        var refs = ProjectRefs("src", "ClearPay.Operations", "ClearPay.Operations.csproj");
+        refs.Should().HaveCount(3);
+        refs.Should().Contain(r => r.Contains("ClearPay.ServiceDefaults", StringComparison.Ordinal));
+        refs.Should().Contain(r => r.Contains("ClearPay.Application", StringComparison.Ordinal));
+        refs.Should().Contain(r => r.Contains("ClearPay.Messaging", StringComparison.Ordinal));
+        refs.Should().NotContain(r => r.Contains("Infrastructure", StringComparison.Ordinal) || r.Contains("ClearPay.Web", StringComparison.Ordinal));
+
+        foreach (var file in Directory.EnumerateFiles(Path.Combine(Root, "src", "ClearPay.Operations"), "*.cs", SearchOption.AllDirectories))
+        {
+            var text = File.ReadAllText(file);
+            text.Should().NotContain("ClearPayDbContext", $"{Path.GetFileName(file)} must not read the ledger database");
+            text.Should().NotContain("LedgerEntry", $"{Path.GetFileName(file)} must not read ledger rows");
+        }
+    }
+
+    [Fact]
+    public void Messaging_building_block_has_no_domain_or_host_references()
+    {
+        ProjectRefs("src", "ClearPay.Messaging", "ClearPay.Messaging.csproj").Should().BeEmpty();
     }
 
     private static IReadOnlyList<string> ProjectRefs(params string[] relativeCsproj)

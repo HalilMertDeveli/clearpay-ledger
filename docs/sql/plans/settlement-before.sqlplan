@@ -1,0 +1,192 @@
+<ShowPlanXML xmlns="http://schemas.microsoft.com/sqlserver/2004/07/showplan" Version="1.564" Build="16.0.4305.5">
+  <BatchSequence>
+    <Batch>
+      <Statements>
+        <StmtSimple StatementText="SELECT [p].[Id], [p].[Amount], [p].[CorrelationId], [p].[CreatedAt], [p].[PaymentId], [p].[Provider], [p].[ProviderIdempotencyKey], [p].[ProviderReference], [p].[Status], [p].[Type], [p].[UpdatedAt] FROM [PaymentOperation] AS [p] WHERE [p].[Type] IN (1, 2) AND [p].[Status] &lt;&gt; 2" StatementId="1" StatementCompId="1" StatementType="SELECT" StatementSqlHandle="0x0900CF14A0B62B817CAD1A6505180A922CB20000000000000000000000000000000000000000000000000000" DatabaseContextSettingsId="1" ParentObjectId="0" StatementParameterizationType="0" RetrievedFromCache="true" StatementSubTreeCost="3.21412" StatementEstRows="122927" SecurityPolicyApplied="false" StatementOptmLevel="FULL" QueryHash="0x4C254234E747C120" QueryPlanHash="0xB17E585BEEB123C0" CardinalityEstimationModelVersion="160">
+          <StatementSetOptions QUOTED_IDENTIFIER="true" ARITHABORT="false" CONCAT_NULL_YIELDS_NULL="true" ANSI_NULLS="true" ANSI_PADDING="true" ANSI_WARNINGS="true" NUMERIC_ROUNDABORT="false">
+          </StatementSetOptions>
+          <QueryPlan DegreeOfParallelism="1" CachedPlanSize="32" CompileTime="42" CompileCPU="37" CompileMemory="232">
+            <MissingIndexes>
+              <MissingIndexGroup Impact="62.7838">
+                <MissingIndex Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]">
+                  <ColumnGroup Usage="INEQUALITY">
+                    <Column Name="[Type]" ColumnId="3">
+                    </Column>
+                    <Column Name="[Status]" ColumnId="4">
+                    </Column>
+                  </ColumnGroup>
+                  <ColumnGroup Usage="INCLUDE">
+                    <Column Name="[PaymentId]" ColumnId="2">
+                    </Column>
+                    <Column Name="[Amount]" ColumnId="5">
+                    </Column>
+                    <Column Name="[Provider]" ColumnId="6">
+                    </Column>
+                    <Column Name="[ProviderReference]" ColumnId="7">
+                    </Column>
+                    <Column Name="[ProviderIdempotencyKey]" ColumnId="8">
+                    </Column>
+                    <Column Name="[CorrelationId]" ColumnId="9">
+                    </Column>
+                    <Column Name="[CreatedAt]" ColumnId="10">
+                    </Column>
+                    <Column Name="[UpdatedAt]" ColumnId="11">
+                    </Column>
+                  </ColumnGroup>
+                </MissingIndex>
+              </MissingIndexGroup>
+            </MissingIndexes>
+            <MemoryGrantInfo SerialRequiredMemory="0" SerialDesiredMemory="0" GrantedMemory="0" MaxUsedMemory="0">
+            </MemoryGrantInfo>
+            <OptimizerHardwareDependentProperties EstimatedAvailableMemoryGrant="64327" EstimatedPagesCached="80409" EstimatedAvailableDegreeOfParallelism="10" MaxCompileMemory="8450912">
+            </OptimizerHardwareDependentProperties>
+            <OptimizerStatsUsage>
+              <StatisticsInfo LastUpdate="2026-11-09T13:07:20.68" ModificationCount="0" SamplingPercent="32.324" Statistics="[_WA_Sys_00000004_5441852A]" Table="[PaymentOperation]" Schema="[dbo]" Database="[ClearPayPlanBenchmark]">
+              </StatisticsInfo>
+              <StatisticsInfo LastUpdate="2026-11-09T13:07:20.70" ModificationCount="0" SamplingPercent="32.324" Statistics="[_WA_Sys_00000003_5441852A]" Table="[PaymentOperation]" Schema="[dbo]" Database="[ClearPayPlanBenchmark]">
+              </StatisticsInfo>
+            </OptimizerStatsUsage>
+            <WaitStats>
+              <Wait WaitType="ASYNC_NETWORK_IO" WaitTimeMs="19" WaitCount="8">
+              </Wait>
+            </WaitStats>
+            <QueryTimeStats ElapsedTime="87" CpuTime="68">
+            </QueryTimeStats>
+            <RelOp NodeId="0" PhysicalOp="Clustered Index Scan" LogicalOp="Clustered Index Scan" EstimateRows="122927" EstimatedRowsRead="125000" EstimateIO="3.07646" EstimateCPU="0.137657" AvgRowSize="277" EstimatedTotalSubtreeCost="3.21412" TableCardinality="125000" Parallel="0" EstimateRebinds="0" EstimateRewinds="0" EstimatedExecutionMode="Row">
+              <OutputList>
+                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="Id">
+                </ColumnReference>
+                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="PaymentId">
+                </ColumnReference>
+                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="Type">
+                </ColumnReference>
+                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="Status">
+                </ColumnReference>
+                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="Amount">
+                </ColumnReference>
+                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="Provider">
+                </ColumnReference>
+                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="ProviderReference">
+                </ColumnReference>
+                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="ProviderIdempotencyKey">
+                </ColumnReference>
+                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="CorrelationId">
+                </ColumnReference>
+                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="CreatedAt">
+                </ColumnReference>
+                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="UpdatedAt">
+                </ColumnReference>
+              </OutputList>
+              <RunTimeInformation>
+                <RunTimeCountersPerThread Thread="0" ActualRows="122976" Batches="0" ActualElapsedms="39" ActualCPUms="39" ActualScans="1" ActualLogicalReads="4179" ActualPhysicalReads="0" ActualReadAheads="0" ActualLobLogicalReads="0" ActualLobPhysicalReads="0" ActualLobReadAheads="0" ActualRowsRead="125000" ActualEndOfScans="1" ActualExecutions="1" ActualExecutionMode="Row">
+                </RunTimeCountersPerThread>
+              </RunTimeInformation>
+              <IndexScan Ordered="0" ForcedIndex="0" ForceScan="0" NoExpandHint="0" Storage="RowStore">
+                <DefinedValues>
+                  <DefinedValue>
+                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="Id">
+                    </ColumnReference>
+                  </DefinedValue>
+                  <DefinedValue>
+                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="PaymentId">
+                    </ColumnReference>
+                  </DefinedValue>
+                  <DefinedValue>
+                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="Type">
+                    </ColumnReference>
+                  </DefinedValue>
+                  <DefinedValue>
+                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="Status">
+                    </ColumnReference>
+                  </DefinedValue>
+                  <DefinedValue>
+                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="Amount">
+                    </ColumnReference>
+                  </DefinedValue>
+                  <DefinedValue>
+                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="Provider">
+                    </ColumnReference>
+                  </DefinedValue>
+                  <DefinedValue>
+                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="ProviderReference">
+                    </ColumnReference>
+                  </DefinedValue>
+                  <DefinedValue>
+                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="ProviderIdempotencyKey">
+                    </ColumnReference>
+                  </DefinedValue>
+                  <DefinedValue>
+                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="CorrelationId">
+                    </ColumnReference>
+                  </DefinedValue>
+                  <DefinedValue>
+                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="CreatedAt">
+                    </ColumnReference>
+                  </DefinedValue>
+                  <DefinedValue>
+                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="UpdatedAt">
+                    </ColumnReference>
+                  </DefinedValue>
+                </DefinedValues>
+                <Object Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Index="[PK_PaymentOperation]" Alias="[p]" IndexKind="Clustered" Storage="RowStore">
+                </Object>
+                <Predicate>
+                  <ScalarOperator ScalarString="[ClearPayPlanBenchmark].[dbo].[PaymentOperation].[Status] as [p].[Status]&lt;&gt;(2) AND ([ClearPayPlanBenchmark].[dbo].[PaymentOperation].[Type] as [p].[Type]=(1) OR [ClearPayPlanBenchmark].[dbo].[PaymentOperation].[Type] as [p].[Type]=(2))">
+                    <Logical Operation="AND">
+                      <ScalarOperator>
+                        <Compare CompareOp="NE">
+                          <ScalarOperator>
+                            <Identifier>
+                              <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="Status">
+                              </ColumnReference>
+                            </Identifier>
+                          </ScalarOperator>
+                          <ScalarOperator>
+                            <Const ConstValue="(2)">
+                            </Const>
+                          </ScalarOperator>
+                        </Compare>
+                      </ScalarOperator>
+                      <ScalarOperator>
+                        <Logical Operation="OR">
+                          <ScalarOperator>
+                            <Compare CompareOp="EQ">
+                              <ScalarOperator>
+                                <Identifier>
+                                  <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="Type">
+                                  </ColumnReference>
+                                </Identifier>
+                              </ScalarOperator>
+                              <ScalarOperator>
+                                <Const ConstValue="(1)">
+                                </Const>
+                              </ScalarOperator>
+                            </Compare>
+                          </ScalarOperator>
+                          <ScalarOperator>
+                            <Compare CompareOp="EQ">
+                              <ScalarOperator>
+                                <Identifier>
+                                  <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[PaymentOperation]" Alias="[p]" Column="Type">
+                                  </ColumnReference>
+                                </Identifier>
+                              </ScalarOperator>
+                              <ScalarOperator>
+                                <Const ConstValue="(2)">
+                                </Const>
+                              </ScalarOperator>
+                            </Compare>
+                          </ScalarOperator>
+                        </Logical>
+                      </ScalarOperator>
+                    </Logical>
+                  </ScalarOperator>
+                </Predicate>
+              </IndexScan>
+            </RelOp>
+          </QueryPlan>
+        </StmtSimple>
+      </Statements>
+    </Batch>
+  </BatchSequence>
+</ShowPlanXML>

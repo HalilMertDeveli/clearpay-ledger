@@ -3,9 +3,13 @@
     <Project Path="src/ClearPay.Application/ClearPay.Application.csproj" />
     <Project Path="src/ClearPay.Domain/ClearPay.Domain.csproj" />
     <Project Path="src/ClearPay.Infrastructure/ClearPay.Infrastructure.csproj" />
+    <Project Path="src/ClearPay.Messaging/ClearPay.Messaging.csproj" />
+    <Project Path="src/ClearPay.Operations/ClearPay.Operations.csproj" />
+    <Project Path="src/ClearPay.ServiceDefaults/ClearPay.ServiceDefaults.csproj" />
     <Project Path="src/ClearPay.Web/ClearPay.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/ClearPay.Operations.Tests/ClearPay.Operations.Tests.csproj" />
     <Project Path="tests/ClearPay.Tests/ClearPay.Tests.csproj" />
   </Folder>
 </Solution>
