@@ -172,8 +172,15 @@ namespace ClearPay.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
                     b.Property<Guid>("CorrelationId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
 
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("datetimeoffset");
@@ -625,6 +632,28 @@ namespace ClearPay.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("IX_ReconciliationRun_BusinessDate_Status");
 
                     b.ToTable("ReconciliationRun", (string)null);
+                });
+
+            modelBuilder.Entity("ClearPay.Infrastructure.Messaging.InboxMessage", b =>
+                {
+                    b.Property<string>("Consumer")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Consumer", "MessageId");
+
+                    b.ToTable("InboxMessage", (string)null);
                 });
 
             modelBuilder.Entity("ClearPay.Domain.Ledger.LedgerEntry", b =>

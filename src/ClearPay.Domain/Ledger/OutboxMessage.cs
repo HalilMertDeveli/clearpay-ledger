@@ -23,4 +23,9 @@ public sealed class OutboxMessage
 
     /// <summary>Null = unpublished. Worker sets this after a successful publish.</summary>
     public DateTimeOffset? ProcessedAt { get; set; }
+
+    /// <summary>Failed publish attempts so far; the row becomes Failed after the processor's limit.</summary>
+    public int Attempts { get; set; }
+
+    public string? LastError { get; set; }
 }

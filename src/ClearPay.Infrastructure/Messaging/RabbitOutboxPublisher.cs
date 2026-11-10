@@ -1,74 +1,49 @@
 using System.Text;
 using ClearPay.Application.Ports;
 using Microsoft.Extensions.Logging;
-using RabbitMQ.Client;
 
 namespace ClearPay.Infrastructure.Messaging;
 
+/// <summary>
+/// Publishes an outbox row to the <c>clearpay.events</c> topic exchange (routing key = event type) with
+/// publisher confirms. MessageId = outbox row id. Throws when the broker is unreachable or does not
+/// confirm, so the outbox keeps the row and retries it.
+/// </summary>
 public sealed class RabbitOutboxPublisher : IOutboxPublisher
 {
-    public const string QueueName = "clearpay.outbox";
-
-    private readonly IConnection? _connection;
+    private static readonly TimeSpan ConfirmTimeout = TimeSpan.FromSeconds(5);
+    private readonly RabbitConnectionProvider _connections;
+    private readonly RabbitOptions _options;
     private readonly ILogger<RabbitOutboxPublisher> _logger;
-    private readonly LoggingOutboxPublisher _fallback;
 
-    public RabbitOutboxPublisher(
-        IConnection? connection,
-        ILogger<RabbitOutboxPublisher> logger,
-        LoggingOutboxPublisher fallback)
+    public RabbitOutboxPublisher(RabbitConnectionProvider connections, RabbitOptions options, ILogger<RabbitOutboxPublisher> logger)
     {
-        _connection = connection;
+        _connections = connections;
+        _options = options;
         _logger = logger;
-        _fallback = fallback;
     }
 
-    public Task PublishAsync(string type, string payload, Guid correlationId, CancellationToken cancellationToken = default)
+    public Task PublishAsync(Guid messageId, string type, string payload, Guid correlationId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (_connection is null || !_connection.IsOpen)
-        {
-            return _fallback.PublishAsync(type, payload, correlationId, cancellationToken);
-        }
+        var connection = _connections.Get();
+        using var channel = connection.CreateModel();
+        channel.ConfirmSelect();
+        RabbitTopology.DeclareEvents(channel, _options);
 
-        try
-        {
-            using var channel = _connection.CreateModel();
-            channel.QueueDeclare(QueueName, durable: true, exclusive: false, autoDelete: false);
-            var body = Encoding.UTF8.GetBytes(payload ?? string.Empty);
-            var props = channel.CreateBasicProperties();
-            props.Persistent = true;
-            props.Type = type;
-            props.CorrelationId = correlationId.ToString();
-            channel.BasicPublish(exchange: string.Empty, routingKey: QueueName, basicProperties: props, body: body);
-            return Task.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Rabbit publish failed; falling back to log publisher.");
-            return _fallback.PublishAsync(type, payload, correlationId, cancellationToken);
-        }
-    }
-}
+        var props = channel.CreateBasicProperties();
+        props.Persistent = true;
+        props.MessageId = messageId.ToString();
+        props.Type = type;
+        props.CorrelationId = correlationId.ToString();
+        props.ContentType = "application/json";
+        props.Timestamp = new RabbitMQ.Client.AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        props.Headers = new Dictionary<string, object>();
+        MessageTracing.Inject(props.Headers);
 
-internal static class RabbitConnectionFactory
-{
-    public static IConnection? TryCreate(string? amqp)
-    {
-        if (string.IsNullOrWhiteSpace(amqp))
-            return null;
-        try
-        {
-            var factory = new ConnectionFactory
-            {
-                Uri = new Uri(amqp),
-                RequestedConnectionTimeout = TimeSpan.FromSeconds(2)
-            };
-            return factory.CreateConnection("clearpay");
-        }
-        catch (Exception)
-        {
-            return null;
-        }
+        channel.BasicPublish(_options.EventsExchange, type, mandatory: false, props, Encoding.UTF8.GetBytes(payload ?? string.Empty));
+        channel.WaitForConfirmsOrDie(ConfirmTimeout);
+        _logger.LogDebug("Published {Type} {MessageId}", type, messageId);
+        return Task.CompletedTask;
     }
 }

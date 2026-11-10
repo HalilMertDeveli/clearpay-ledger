@@ -48,12 +48,13 @@ public sealed class OutboxProcessorTests : IDisposable
     }
 
     [Fact]
-    public async Task Publisher_failure_marks_failed_and_row_remains()
+    public async Task Publisher_failure_keeps_the_row_pending_until_the_attempt_limit_then_marks_failed()
     {
         _publisher.Fail = true;
+        var id = Guid.NewGuid();
         _db.OutboxMessages.Add(new OutboxMessage
         {
-            Id = Guid.NewGuid(),
+            Id = id,
             Type = "clearpay.topup.timeout",
             Payload = "{}",
             CorrelationId = Guid.NewGuid(),
@@ -62,10 +63,40 @@ public sealed class OutboxProcessorTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
+        for (var i = 1; i < SqlOutboxProcessor.MaxAttempts; i++)
+        {
+            await _processor.ProcessPendingAsync();
+            var pending = await _db.OutboxMessages.AsNoTracking().SingleAsync();
+            pending.Status.Should().Be(OutboxStatus.Pending);
+            pending.Attempts.Should().Be(i);
+            pending.LastError.Should().Be("broker down");
+        }
+
         await _processor.ProcessPendingAsync();
-        var row = await _db.OutboxMessages.SingleAsync();
+        var row = await _db.OutboxMessages.AsNoTracking().SingleAsync();
         row.Status.Should().Be(OutboxStatus.Failed);
-        row.Id.Should().NotBe(Guid.Empty);
+        row.Id.Should().Be(id);
+    }
+
+    [Fact]
+    public async Task Publishes_with_the_outbox_row_id_as_message_id_and_stops_the_batch_on_failure()
+    {
+        var first = Guid.NewGuid();
+        foreach (var (id, offset) in new[] { (first, 0), (Guid.NewGuid(), 1) })
+        {
+            _db.OutboxMessages.Add(new OutboxMessage
+            {
+                Id = id, Type = "t", Payload = "{}", CorrelationId = Guid.NewGuid(),
+                OccurredAt = DateTimeOffset.UtcNow.AddSeconds(offset), Status = OutboxStatus.Pending
+            });
+        }
+
+        await _db.SaveChangesAsync();
+        _publisher.FailAfter = 1;
+
+        (await _processor.ProcessPendingAsync()).Should().Be(1);
+        _publisher.MessageIds.Should().Equal(first);
+        (await _db.OutboxMessages.CountAsync(m => m.Status == OutboxStatus.Pending)).Should().Be(1);
     }
 
     public void Dispose()
@@ -80,10 +111,15 @@ public sealed class OutboxProcessorTests : IDisposable
 
         public bool Fail { get; set; }
 
-        public Task PublishAsync(string type, string payload, Guid correlationId, CancellationToken cancellationToken = default)
+        public int? FailAfter { get; set; }
+
+        public List<Guid> MessageIds { get; } = new();
+
+        public Task PublishAsync(Guid messageId, string type, string payload, Guid correlationId, CancellationToken cancellationToken = default)
         {
-            if (Fail)
+            if (Fail || (FailAfter is not null && Count >= FailAfter))
                 throw new InvalidOperationException("broker down");
+            MessageIds.Add(messageId);
             Count++;
             return Task.CompletedTask;
         }

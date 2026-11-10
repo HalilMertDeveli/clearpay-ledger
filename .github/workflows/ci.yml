@@ -35,6 +35,15 @@ jobs:
           --health-timeout 5s
           --health-retries 12
           --health-start-period 20s
+      rabbitmq:
+        image: rabbitmq:3.13-management-alpine
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v5
 
@@ -48,8 +57,10 @@ jobs:
       - name: Build
         run: dotnet build "$TEST_PROJECT" --no-restore --configuration Release
 
-      - name: Test (SQLite integration + SQL Server integration)
+      - name: Test (SQLite integration + SQL Server + RabbitMQ integration)
         env:
+          # Enables the [RabbitFact] tests (redelivery, retry with backoff, dead-letter queue) against the service container.
+          CLEARPAY_TEST_RABBITMQ: amqp://guest:guest@localhost:5672/
           # Enables the [SqlServerFact] tests (concurrency, rollback, constraints) against the service container.
           CLEARPAY_TEST_SQLSERVER: Server=localhost,1433;User Id=sa;Password=${{ env.MSSQL_SA_PASSWORD }};TrustServerCertificate=True;Encrypt=True
         run: >-
