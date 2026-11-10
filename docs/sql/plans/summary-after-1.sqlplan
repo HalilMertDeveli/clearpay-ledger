@@ -1,0 +1,582 @@
+<ShowPlanXML xmlns="http://schemas.microsoft.com/sqlserver/2004/07/showplan" Version="1.564" Build="16.0.4305.5">
+  <BatchSequence>
+    <Batch>
+      <Statements>
+        <StmtSimple StatementText="SELECT&#xD;&#xA;        CAST(ISNULL(SUM(e.Amount), 0) AS decimal(18, 2)) AS Balance,&#xD;&#xA;        CAST(ISNULL(SUM(CASE WHEN e.CreatedAt &gt;= @MonthStart AND e.Amount &gt; 0 THEN e.Amount END), 0) AS decimal(18, 2)) AS MonthIncoming,&#xD;&#xA;        CAST(ISNULL(-SUM(CASE WHEN e.CreatedAt &gt;= @MonthStart AND e.Amount &lt; 0 THEN e.Amount END), 0) AS decimal(18, 2)) AS MonthOutgoing&#xD;&#xA;    FROM dbo.LedgerEntry AS e&#xD;&#xA;    WHERE e.WalletId = @WalletId" StatementId="1" StatementCompId="4" StatementType="SELECT" StatementSqlHandle="0x0900CEBD16EF5E5E724712781C20A0CCF7460000000000000000000000000000000000000000000000000000" DatabaseContextSettingsId="2" ParentObjectId="1621580815" StatementParameterizationType="0" RetrievedFromCache="true" StatementSubTreeCost="0.878912" StatementEstRows="1" SecurityPolicyApplied="false" StatementOptmLevel="TRIVIAL" QueryHash="0x0CE084B5F66D15AA" QueryPlanHash="0x6FE577569814A367" CardinalityEstimationModelVersion="160">
+          <StatementSetOptions QUOTED_IDENTIFIER="true" ARITHABORT="false" CONCAT_NULL_YIELDS_NULL="true" ANSI_NULLS="true" ANSI_PADDING="true" ANSI_WARNINGS="true" NUMERIC_ROUNDABORT="false">
+          </StatementSetOptions>
+          <QueryPlan DegreeOfParallelism="1" CachedPlanSize="48" CompileTime="0" CompileCPU="0" CompileMemory="336">
+            <MemoryGrantInfo SerialRequiredMemory="0" SerialDesiredMemory="0" GrantedMemory="0" MaxUsedMemory="0">
+            </MemoryGrantInfo>
+            <OptimizerHardwareDependentProperties EstimatedAvailableMemoryGrant="64327" EstimatedPagesCached="80409" EstimatedAvailableDegreeOfParallelism="10" MaxCompileMemory="8552472">
+            </OptimizerHardwareDependentProperties>
+            <OptimizerStatsUsage>
+              <StatisticsInfo LastUpdate="2026-11-09T13:07:22.03" ModificationCount="0" SamplingPercent="100" Statistics="[IX_LedgerEntry_WalletId_CreatedAt]" Table="[LedgerEntry]" Schema="[dbo]" Database="[ClearPayPlanBenchmark]">
+              </StatisticsInfo>
+            </OptimizerStatsUsage>
+            <QueryTimeStats ElapsedTime="22" CpuTime="22">
+            </QueryTimeStats>
+            <RelOp NodeId="0" PhysicalOp="Compute Scalar" LogicalOp="Compute Scalar" EstimateRows="1" EstimateIO="0" EstimateCPU="1e-07" AvgRowSize="34" EstimatedTotalSubtreeCost="0.878912" Parallel="0" EstimateRebinds="0" EstimateRewinds="0" EstimatedExecutionMode="Row">
+              <OutputList>
+                <ColumnReference Column="Expr1004">
+                </ColumnReference>
+                <ColumnReference Column="Expr1005">
+                </ColumnReference>
+                <ColumnReference Column="Expr1006">
+                </ColumnReference>
+              </OutputList>
+              <ComputeScalar>
+                <DefinedValues>
+                  <DefinedValue>
+                    <ColumnReference Column="Expr1004">
+                    </ColumnReference>
+                    <ScalarOperator ScalarString="CONVERT(decimal(18,2),isnull([Expr1001],(0.00)),0)">
+                      <Convert DataType="decimal" Precision="18" Scale="2" Style="0" Implicit="0">
+                        <ScalarOperator>
+                          <Intrinsic FunctionName="isnull">
+                            <ScalarOperator>
+                              <Identifier>
+                                <ColumnReference Column="Expr1001">
+                                </ColumnReference>
+                              </Identifier>
+                            </ScalarOperator>
+                            <ScalarOperator>
+                              <Const ConstValue="(0.00)">
+                              </Const>
+                            </ScalarOperator>
+                          </Intrinsic>
+                        </ScalarOperator>
+                      </Convert>
+                    </ScalarOperator>
+                  </DefinedValue>
+                  <DefinedValue>
+                    <ColumnReference Column="Expr1005">
+                    </ColumnReference>
+                    <ScalarOperator ScalarString="CONVERT(decimal(18,2),isnull([Expr1002],(0.00)),0)">
+                      <Convert DataType="decimal" Precision="18" Scale="2" Style="0" Implicit="0">
+                        <ScalarOperator>
+                          <Intrinsic FunctionName="isnull">
+                            <ScalarOperator>
+                              <Identifier>
+                                <ColumnReference Column="Expr1002">
+                                </ColumnReference>
+                              </Identifier>
+                            </ScalarOperator>
+                            <ScalarOperator>
+                              <Const ConstValue="(0.00)">
+                              </Const>
+                            </ScalarOperator>
+                          </Intrinsic>
+                        </ScalarOperator>
+                      </Convert>
+                    </ScalarOperator>
+                  </DefinedValue>
+                  <DefinedValue>
+                    <ColumnReference Column="Expr1006">
+                    </ColumnReference>
+                    <ScalarOperator ScalarString="CONVERT(decimal(18,2),isnull( -[Expr1003],(0.00)),0)">
+                      <Convert DataType="decimal" Precision="18" Scale="2" Style="0" Implicit="0">
+                        <ScalarOperator>
+                          <Intrinsic FunctionName="isnull">
+                            <ScalarOperator>
+                              <Arithmetic Operation="MINUS">
+                                <ScalarOperator>
+                                  <Identifier>
+                                    <ColumnReference Column="Expr1003">
+                                    </ColumnReference>
+                                  </Identifier>
+                                </ScalarOperator>
+                              </Arithmetic>
+                            </ScalarOperator>
+                            <ScalarOperator>
+                              <Const ConstValue="(0.00)">
+                              </Const>
+                            </ScalarOperator>
+                          </Intrinsic>
+                        </ScalarOperator>
+                      </Convert>
+                    </ScalarOperator>
+                  </DefinedValue>
+                </DefinedValues>
+                <RelOp NodeId="1" PhysicalOp="Compute Scalar" LogicalOp="Compute Scalar" EstimateRows="1" EstimateIO="0" EstimateCPU="0" AvgRowSize="58" EstimatedTotalSubtreeCost="0.878912" Parallel="0" EstimateRebinds="0" EstimateRewinds="0" EstimatedExecutionMode="Row">
+                  <OutputList>
+                    <ColumnReference Column="Expr1001">
+                    </ColumnReference>
+                    <ColumnReference Column="Expr1002">
+                    </ColumnReference>
+                    <ColumnReference Column="Expr1003">
+                    </ColumnReference>
+                  </OutputList>
+                  <ComputeScalar>
+                    <DefinedValues>
+                      <DefinedValue>
+                        <ColumnReference Column="Expr1001">
+                        </ColumnReference>
+                        <ScalarOperator ScalarString="CASE WHEN [Expr1013]=(0) THEN NULL ELSE [Expr1014] END">
+                          <IF>
+                            <Condition>
+                              <ScalarOperator>
+                                <Compare CompareOp="EQ">
+                                  <ScalarOperator>
+                                    <Identifier>
+                                      <ColumnReference Column="Expr1013">
+                                      </ColumnReference>
+                                    </Identifier>
+                                  </ScalarOperator>
+                                  <ScalarOperator>
+                                    <Const ConstValue="(0)">
+                                    </Const>
+                                  </ScalarOperator>
+                                </Compare>
+                              </ScalarOperator>
+                            </Condition>
+                            <Then>
+                              <ScalarOperator>
+                                <Const ConstValue="NULL">
+                                </Const>
+                              </ScalarOperator>
+                            </Then>
+                            <Else>
+                              <ScalarOperator>
+                                <Identifier>
+                                  <ColumnReference Column="Expr1014">
+                                  </ColumnReference>
+                                </Identifier>
+                              </ScalarOperator>
+                            </Else>
+                          </IF>
+                        </ScalarOperator>
+                      </DefinedValue>
+                      <DefinedValue>
+                        <ColumnReference Column="Expr1002">
+                        </ColumnReference>
+                        <ScalarOperator ScalarString="CASE WHEN [Expr1015]=(0) THEN NULL ELSE [Expr1016] END">
+                          <IF>
+                            <Condition>
+                              <ScalarOperator>
+                                <Compare CompareOp="EQ">
+                                  <ScalarOperator>
+                                    <Identifier>
+                                      <ColumnReference Column="Expr1015">
+                                      </ColumnReference>
+                                    </Identifier>
+                                  </ScalarOperator>
+                                  <ScalarOperator>
+                                    <Const ConstValue="(0)">
+                                    </Const>
+                                  </ScalarOperator>
+                                </Compare>
+                              </ScalarOperator>
+                            </Condition>
+                            <Then>
+                              <ScalarOperator>
+                                <Const ConstValue="NULL">
+                                </Const>
+                              </ScalarOperator>
+                            </Then>
+                            <Else>
+                              <ScalarOperator>
+                                <Identifier>
+                                  <ColumnReference Column="Expr1016">
+                                  </ColumnReference>
+                                </Identifier>
+                              </ScalarOperator>
+                            </Else>
+                          </IF>
+                        </ScalarOperator>
+                      </DefinedValue>
+                      <DefinedValue>
+                        <ColumnReference Column="Expr1003">
+                        </ColumnReference>
+                        <ScalarOperator ScalarString="CASE WHEN [Expr1017]=(0) THEN NULL ELSE [Expr1018] END">
+                          <IF>
+                            <Condition>
+                              <ScalarOperator>
+                                <Compare CompareOp="EQ">
+                                  <ScalarOperator>
+                                    <Identifier>
+                                      <ColumnReference Column="Expr1017">
+                                      </ColumnReference>
+                                    </Identifier>
+                                  </ScalarOperator>
+                                  <ScalarOperator>
+                                    <Const ConstValue="(0)">
+                                    </Const>
+                                  </ScalarOperator>
+                                </Compare>
+                              </ScalarOperator>
+                            </Condition>
+                            <Then>
+                              <ScalarOperator>
+                                <Const ConstValue="NULL">
+                                </Const>
+                              </ScalarOperator>
+                            </Then>
+                            <Else>
+                              <ScalarOperator>
+                                <Identifier>
+                                  <ColumnReference Column="Expr1018">
+                                  </ColumnReference>
+                                </Identifier>
+                              </ScalarOperator>
+                            </Else>
+                          </IF>
+                        </ScalarOperator>
+                      </DefinedValue>
+                    </DefinedValues>
+                    <RelOp NodeId="2" PhysicalOp="Stream Aggregate" LogicalOp="Aggregate" EstimateRows="1" EstimateIO="0" EstimateCPU="0.0600005" AvgRowSize="58" EstimatedTotalSubtreeCost="0.878912" Parallel="0" EstimateRebinds="0" EstimateRewinds="0" EstimatedExecutionMode="Row">
+                      <OutputList>
+                        <ColumnReference Column="Expr1013">
+                        </ColumnReference>
+                        <ColumnReference Column="Expr1014">
+                        </ColumnReference>
+                        <ColumnReference Column="Expr1015">
+                        </ColumnReference>
+                        <ColumnReference Column="Expr1016">
+                        </ColumnReference>
+                        <ColumnReference Column="Expr1017">
+                        </ColumnReference>
+                        <ColumnReference Column="Expr1018">
+                        </ColumnReference>
+                      </OutputList>
+                      <RunTimeInformation>
+                        <RunTimeCountersPerThread Thread="0" ActualRows="1" Batches="0" ActualElapsedms="22" ActualCPUms="22" ActualEndOfScans="1" ActualExecutions="1" ActualExecutionMode="Row">
+                        </RunTimeCountersPerThread>
+                      </RunTimeInformation>
+                      <StreamAggregate>
+                        <DefinedValues>
+                          <DefinedValue>
+                            <ColumnReference Column="Expr1013">
+                            </ColumnReference>
+                            <ScalarOperator ScalarString="Count(*)">
+                              <Aggregate AggType="countstar" Distinct="0">
+                              </Aggregate>
+                            </ScalarOperator>
+                          </DefinedValue>
+                          <DefinedValue>
+                            <ColumnReference Column="Expr1014">
+                            </ColumnReference>
+                            <ScalarOperator ScalarString="SUM([ClearPayPlanBenchmark].[dbo].[LedgerEntry].[Amount] as [e].[Amount])">
+                              <Aggregate Distinct="0" AggType="SUM">
+                                <ScalarOperator>
+                                  <Identifier>
+                                    <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Amount">
+                                    </ColumnReference>
+                                  </Identifier>
+                                </ScalarOperator>
+                              </Aggregate>
+                            </ScalarOperator>
+                          </DefinedValue>
+                          <DefinedValue>
+                            <ColumnReference Column="Expr1015">
+                            </ColumnReference>
+                            <ScalarOperator ScalarString="COUNT_BIG(CASE WHEN [ClearPayPlanBenchmark].[dbo].[LedgerEntry].[CreatedAt] as [e].[CreatedAt]&gt;=[@MonthStart] AND [ClearPayPlanBenchmark].[dbo].[LedgerEntry].[Amount] as [e].[Amount]&gt;(0.00) THEN [ClearPayPlanBenchmark].[dbo].[LedgerEntry].[Amount] as [e].[Amount] ELSE NULL END)">
+                              <Aggregate Distinct="0" AggType="COUNT_BIG">
+                                <ScalarOperator>
+                                  <IF>
+                                    <Condition>
+                                      <ScalarOperator>
+                                        <Logical Operation="AND">
+                                          <ScalarOperator>
+                                            <Compare CompareOp="GE">
+                                              <ScalarOperator>
+                                                <Identifier>
+                                                  <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="CreatedAt">
+                                                  </ColumnReference>
+                                                </Identifier>
+                                              </ScalarOperator>
+                                              <ScalarOperator>
+                                                <Identifier>
+                                                  <ColumnReference Column="@MonthStart">
+                                                  </ColumnReference>
+                                                </Identifier>
+                                              </ScalarOperator>
+                                            </Compare>
+                                          </ScalarOperator>
+                                          <ScalarOperator>
+                                            <Compare CompareOp="GT">
+                                              <ScalarOperator>
+                                                <Identifier>
+                                                  <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Amount">
+                                                  </ColumnReference>
+                                                </Identifier>
+                                              </ScalarOperator>
+                                              <ScalarOperator>
+                                                <Const ConstValue="(0.00)">
+                                                </Const>
+                                              </ScalarOperator>
+                                            </Compare>
+                                          </ScalarOperator>
+                                        </Logical>
+                                      </ScalarOperator>
+                                    </Condition>
+                                    <Then>
+                                      <ScalarOperator>
+                                        <Identifier>
+                                          <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Amount">
+                                          </ColumnReference>
+                                        </Identifier>
+                                      </ScalarOperator>
+                                    </Then>
+                                    <Else>
+                                      <ScalarOperator>
+                                        <Const ConstValue="NULL">
+                                        </Const>
+                                      </ScalarOperator>
+                                    </Else>
+                                  </IF>
+                                </ScalarOperator>
+                              </Aggregate>
+                            </ScalarOperator>
+                          </DefinedValue>
+                          <DefinedValue>
+                            <ColumnReference Column="Expr1016">
+                            </ColumnReference>
+                            <ScalarOperator ScalarString="SUM(CASE WHEN [ClearPayPlanBenchmark].[dbo].[LedgerEntry].[CreatedAt] as [e].[CreatedAt]&gt;=[@MonthStart] AND [ClearPayPlanBenchmark].[dbo].[LedgerEntry].[Amount] as [e].[Amount]&gt;(0.00) THEN [ClearPayPlanBenchmark].[dbo].[LedgerEntry].[Amount] as [e].[Amount] ELSE NULL END)">
+                              <Aggregate Distinct="0" AggType="SUM">
+                                <ScalarOperator>
+                                  <IF>
+                                    <Condition>
+                                      <ScalarOperator>
+                                        <Logical Operation="AND">
+                                          <ScalarOperator>
+                                            <Compare CompareOp="GE">
+                                              <ScalarOperator>
+                                                <Identifier>
+                                                  <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="CreatedAt">
+                                                  </ColumnReference>
+                                                </Identifier>
+                                              </ScalarOperator>
+                                              <ScalarOperator>
+                                                <Identifier>
+                                                  <ColumnReference Column="@MonthStart">
+                                                  </ColumnReference>
+                                                </Identifier>
+                                              </ScalarOperator>
+                                            </Compare>
+                                          </ScalarOperator>
+                                          <ScalarOperator>
+                                            <Compare CompareOp="GT">
+                                              <ScalarOperator>
+                                                <Identifier>
+                                                  <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Amount">
+                                                  </ColumnReference>
+                                                </Identifier>
+                                              </ScalarOperator>
+                                              <ScalarOperator>
+                                                <Const ConstValue="(0.00)">
+                                                </Const>
+                                              </ScalarOperator>
+                                            </Compare>
+                                          </ScalarOperator>
+                                        </Logical>
+                                      </ScalarOperator>
+                                    </Condition>
+                                    <Then>
+                                      <ScalarOperator>
+                                        <Identifier>
+                                          <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Amount">
+                                          </ColumnReference>
+                                        </Identifier>
+                                      </ScalarOperator>
+                                    </Then>
+                                    <Else>
+                                      <ScalarOperator>
+                                        <Const ConstValue="NULL">
+                                        </Const>
+                                      </ScalarOperator>
+                                    </Else>
+                                  </IF>
+                                </ScalarOperator>
+                              </Aggregate>
+                            </ScalarOperator>
+                          </DefinedValue>
+                          <DefinedValue>
+                            <ColumnReference Column="Expr1017">
+                            </ColumnReference>
+                            <ScalarOperator ScalarString="COUNT_BIG(CASE WHEN [ClearPayPlanBenchmark].[dbo].[LedgerEntry].[CreatedAt] as [e].[CreatedAt]&gt;=[@MonthStart] AND [ClearPayPlanBenchmark].[dbo].[LedgerEntry].[Amount] as [e].[Amount]&lt;(0.00) THEN [ClearPayPlanBenchmark].[dbo].[LedgerEntry].[Amount] as [e].[Amount] ELSE NULL END)">
+                              <Aggregate Distinct="0" AggType="COUNT_BIG">
+                                <ScalarOperator>
+                                  <IF>
+                                    <Condition>
+                                      <ScalarOperator>
+                                        <Logical Operation="AND">
+                                          <ScalarOperator>
+                                            <Compare CompareOp="GE">
+                                              <ScalarOperator>
+                                                <Identifier>
+                                                  <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="CreatedAt">
+                                                  </ColumnReference>
+                                                </Identifier>
+                                              </ScalarOperator>
+                                              <ScalarOperator>
+                                                <Identifier>
+                                                  <ColumnReference Column="@MonthStart">
+                                                  </ColumnReference>
+                                                </Identifier>
+                                              </ScalarOperator>
+                                            </Compare>
+                                          </ScalarOperator>
+                                          <ScalarOperator>
+                                            <Compare CompareOp="LT">
+                                              <ScalarOperator>
+                                                <Identifier>
+                                                  <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Amount">
+                                                  </ColumnReference>
+                                                </Identifier>
+                                              </ScalarOperator>
+                                              <ScalarOperator>
+                                                <Const ConstValue="(0.00)">
+                                                </Const>
+                                              </ScalarOperator>
+                                            </Compare>
+                                          </ScalarOperator>
+                                        </Logical>
+                                      </ScalarOperator>
+                                    </Condition>
+                                    <Then>
+                                      <ScalarOperator>
+                                        <Identifier>
+                                          <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Amount">
+                                          </ColumnReference>
+                                        </Identifier>
+                                      </ScalarOperator>
+                                    </Then>
+                                    <Else>
+                                      <ScalarOperator>
+                                        <Const ConstValue="NULL">
+                                        </Const>
+                                      </ScalarOperator>
+                                    </Else>
+                                  </IF>
+                                </ScalarOperator>
+                              </Aggregate>
+                            </ScalarOperator>
+                          </DefinedValue>
+                          <DefinedValue>
+                            <ColumnReference Column="Expr1018">
+                            </ColumnReference>
+                            <ScalarOperator ScalarString="SUM(CASE WHEN [ClearPayPlanBenchmark].[dbo].[LedgerEntry].[CreatedAt] as [e].[CreatedAt]&gt;=[@MonthStart] AND [ClearPayPlanBenchmark].[dbo].[LedgerEntry].[Amount] as [e].[Amount]&lt;(0.00) THEN [ClearPayPlanBenchmark].[dbo].[LedgerEntry].[Amount] as [e].[Amount] ELSE NULL END)">
+                              <Aggregate Distinct="0" AggType="SUM">
+                                <ScalarOperator>
+                                  <IF>
+                                    <Condition>
+                                      <ScalarOperator>
+                                        <Logical Operation="AND">
+                                          <ScalarOperator>
+                                            <Compare CompareOp="GE">
+                                              <ScalarOperator>
+                                                <Identifier>
+                                                  <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="CreatedAt">
+                                                  </ColumnReference>
+                                                </Identifier>
+                                              </ScalarOperator>
+                                              <ScalarOperator>
+                                                <Identifier>
+                                                  <ColumnReference Column="@MonthStart">
+                                                  </ColumnReference>
+                                                </Identifier>
+                                              </ScalarOperator>
+                                            </Compare>
+                                          </ScalarOperator>
+                                          <ScalarOperator>
+                                            <Compare CompareOp="LT">
+                                              <ScalarOperator>
+                                                <Identifier>
+                                                  <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Amount">
+                                                  </ColumnReference>
+                                                </Identifier>
+                                              </ScalarOperator>
+                                              <ScalarOperator>
+                                                <Const ConstValue="(0.00)">
+                                                </Const>
+                                              </ScalarOperator>
+                                            </Compare>
+                                          </ScalarOperator>
+                                        </Logical>
+                                      </ScalarOperator>
+                                    </Condition>
+                                    <Then>
+                                      <ScalarOperator>
+                                        <Identifier>
+                                          <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Amount">
+                                          </ColumnReference>
+                                        </Identifier>
+                                      </ScalarOperator>
+                                    </Then>
+                                    <Else>
+                                      <ScalarOperator>
+                                        <Const ConstValue="NULL">
+                                        </Const>
+                                      </ScalarOperator>
+                                    </Else>
+                                  </IF>
+                                </ScalarOperator>
+                              </Aggregate>
+                            </ScalarOperator>
+                          </DefinedValue>
+                        </DefinedValues>
+                        <RelOp NodeId="3" PhysicalOp="Index Seek" LogicalOp="Index Seek" EstimateRows="100000" EstimatedRowsRead="100000" EstimateIO="0.708755" EstimateCPU="0.110157" AvgRowSize="26" EstimatedTotalSubtreeCost="0.818912" TableCardinality="1e+06" Parallel="0" EstimateRebinds="0" EstimateRewinds="0" EstimatedExecutionMode="Row">
+                          <OutputList>
+                            <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Amount">
+                            </ColumnReference>
+                            <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="CreatedAt">
+                            </ColumnReference>
+                          </OutputList>
+                          <RunTimeInformation>
+                            <RunTimeCountersPerThread Thread="0" ActualRows="100000" Batches="0" ActualElapsedms="6" ActualCPUms="6" ActualScans="1" ActualLogicalReads="963" ActualPhysicalReads="0" ActualReadAheads="0" ActualLobLogicalReads="0" ActualLobPhysicalReads="0" ActualLobReadAheads="0" ActualRowsRead="100000" ActualEndOfScans="1" ActualExecutions="1" ActualExecutionMode="Row">
+                            </RunTimeCountersPerThread>
+                          </RunTimeInformation>
+                          <IndexScan Ordered="1" ScanDirection="FORWARD" ForcedIndex="0" ForceSeek="0" ForceScan="0" NoExpandHint="0" Storage="RowStore">
+                            <DefinedValues>
+                              <DefinedValue>
+                                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="Amount">
+                                </ColumnReference>
+                              </DefinedValue>
+                              <DefinedValue>
+                                <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="CreatedAt">
+                                </ColumnReference>
+                              </DefinedValue>
+                            </DefinedValues>
+                            <Object Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Index="[IX_LedgerEntry_WalletId_CreatedAt]" Alias="[e]" IndexKind="NonClustered" Storage="RowStore">
+                            </Object>
+                            <SeekPredicates>
+                              <SeekPredicateNew>
+                                <SeekKeys>
+                                  <Prefix ScanType="EQ">
+                                    <RangeColumns>
+                                      <ColumnReference Database="[ClearPayPlanBenchmark]" Schema="[dbo]" Table="[LedgerEntry]" Alias="[e]" Column="WalletId">
+                                      </ColumnReference>
+                                    </RangeColumns>
+                                    <RangeExpressions>
+                                      <ScalarOperator ScalarString="[@WalletId]">
+                                        <Identifier>
+                                          <ColumnReference Column="@WalletId">
+                                          </ColumnReference>
+                                        </Identifier>
+                                      </ScalarOperator>
+                                    </RangeExpressions>
+                                  </Prefix>
+                                </SeekKeys>
+                              </SeekPredicateNew>
+                            </SeekPredicates>
+                          </IndexScan>
+                        </RelOp>
+                      </StreamAggregate>
+                    </RelOp>
+                  </ComputeScalar>
+                </RelOp>
+              </ComputeScalar>
+            </RelOp>
+            <ParameterList>
+              <ColumnReference Column="@MonthStart" ParameterDataType="datetimeoffset(7)" ParameterCompiledValue="'2026-11-01 00:00:00.0000000 +00:00'" ParameterRuntimeValue="'2026-11-01 00:00:00.0000000 +00:00'">
+              </ColumnReference>
+              <ColumnReference Column="@WalletId" ParameterDataType="uniqueidentifier" ParameterCompiledValue="{guid'11111111-1111-1111-1111-111111111111'}" ParameterRuntimeValue="{guid'11111111-1111-1111-1111-111111111111'}">
+              </ColumnReference>
+            </ParameterList>
+          </QueryPlan>
+        </StmtSimple>
+      </Statements>
+    </Batch>
+  </BatchSequence>
+</ShowPlanXML>

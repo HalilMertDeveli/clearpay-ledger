@@ -122,6 +122,8 @@ namespace ClearPay.Infrastructure.Persistence.Migrations
                     b.HasIndex("WalletId", "CreatedAt")
                         .HasDatabaseName("IX_LedgerEntry_WalletId_CreatedAt");
 
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("WalletId", "CreatedAt"), new[] { "Amount", "Kind", "CorrelationId" });
+
                     b.ToTable("LedgerEntry", null, t =>
                         {
                             t.HasCheckConstraint("CK_LedgerEntry_Amount_NotZero", "[Amount] <> 0");
@@ -393,6 +395,11 @@ namespace ClearPay.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PaymentId")
                         .HasDatabaseName("IX_PaymentOperation_PaymentId");
+
+                    b.HasIndex("CreatedAt", "Type")
+                        .HasDatabaseName("IX_PaymentOperation_CreatedAt_Type");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("CreatedAt", "Type"), new[] { "Status", "Provider", "ProviderReference", "CorrelationId", "Amount" });
 
                     b.HasIndex("Provider", "ProviderIdempotencyKey")
                         .IsUnique()

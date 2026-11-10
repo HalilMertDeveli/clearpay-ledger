@@ -48,6 +48,10 @@ internal sealed class PaymentOperationConfiguration : IEntityTypeConfiguration<P
         builder.HasIndex(x => new { x.Provider, x.ProviderIdempotencyKey }).IsUnique()
             .HasDatabaseName("UX_PaymentOperation_Provider_Key");
         builder.HasIndex(x => x.PaymentId).HasDatabaseName("IX_PaymentOperation_PaymentId");
+        // Nightly reconciliation reads one day of captures/refunds (dbo.usp_PaymentSettlementCandidates).
+        builder.HasIndex(x => new { x.CreatedAt, x.Type })
+            .HasDatabaseName("IX_PaymentOperation_CreatedAt_Type")
+            .IncludeProperties(x => new { x.Status, x.Provider, x.ProviderReference, x.CorrelationId, x.Amount });
     }
 }
 
