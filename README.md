@@ -85,6 +85,7 @@ flowchart LR
 | `ClearPay.Infrastructure` | EF Core (SQL Server, SQLite for tests), Identity, JWT, Redis, RabbitMQ, Hangfire, gateways | Razor, CSS |
 | `ClearPay.Web` | Composition root, controllers, Razor Pages, SignalR hub | Ledger arithmetic |
 | `ClearPay.Messaging` | Shared building block: RabbitMQ topology, consumer host with retry / DLQ, inbox, trace headers | Domain types, tables |
+| `ClearPay.ServiceDefaults` | Serilog + OpenTelemetry setup shared by both hosts | Business code |
 | `ClearPay.Operations` | Separate service: notifications + nightly reconciliation, own database (schema `ops`) | Any reference to the ledger host or its database |
 | `mobile/clearpay` | Flutter client (JWT); no local balance | Any money logic |
 
@@ -421,6 +422,58 @@ $env:CLEARPAY_BENCH_SA_PASSWORD = '<sa password of a throw-away local container>
 ./scripts/sql/Measure-LedgerPlans.ps1 -Server '127.0.0.1,14339'
 ```
 
+## Observability: One Payment, One Trace, Across Both Services
+
+Both hosts call `AddClearPayObservability` (`src/ClearPay.ServiceDefaults`): **Serilog** writes
+structured logs to the console and **Seq**, every event carrying `TraceId` / `SpanId` and `Service`;
+**OpenTelemetry** exports traces and metrics over OTLP to a collector that fans out to **Tempo**
+(Grafana), **Seq** (traces next to logs) and **Prometheus**. Nothing is exported unless
+`Otel:Endpoint` / `Seq:Url` are set, so tests and a plain `dotnet run` need no collector.
+
+How the trace survives the asynchronous hops:
+
+1. ASP.NET Core and SqlClient instrumentation create the request and SQL spans; `ClearPay.Payments`
+   adds one client span per PSP call (`psp simbank-rest authorize`), marked as an error with the
+   decline code when the PSP declines or times out.
+2. Every new outbox row stores the request's W3C `traceparent` (`OutboxMessage.TraceParent`, stamped in
+   `SaveChanges`). The Hangfire outbox job runs up to a minute later with no ambient context; it starts
+   `outbox <event type>` as a **child of the stored traceparent**, so the publish joins the original trace.
+3. `RabbitEventPublisher` writes `traceparent` / `tracestate` into the AMQP headers; the consumer host
+   in the Operations service starts its `process` span as a child of them; the inbox and projection
+   SQL spans nest under it. Retries keep the headers, so a retried delivery shows up in the same trace
+   with a higher `messaging.rabbitmq.attempt`.
+4. Every HTTP response carries a `traceparent` header and every problem response a `traceId`, so
+   support starts from what the client saw.
+
+Measured locally on 2026-11-09 with the stack below and demo data (one 250.00 TRY card payment, a
+40.00 refund, a payment declined by the PSP with code `51`, a 3-D Secure decline): the captured
+payment's trace held **75 spans in 2 services** (request, both PSP calls, SQL, 6 outbox publishes,
+RabbitMQ consumers and their SQL in `ClearPayOps`); the declined one 38 spans. Custom metrics
+`clearpay_psp_calls_total{provider,operation,outcome}` and `clearpay_threeds_results_total{status}`
+were in Prometheus.
+
+The declined payment in Grafana (Tempo): the 402 request, the failed `psp simbank-rest authorize`
+span, and - 39 s later - the outbox publishes and the Operations service's consumers in the same trace:
+
+![Declined payment trace in Grafana Tempo](docs/assets/observability/grafana-tempo-trace-declined.png)
+
+The same trace id in Seq: log events and spans of both services, including
+`PSP Declined -> payment Declined` and the Operations service's `Notification card-payment-declined`:
+
+![Declined payment logs and spans in Seq](docs/assets/observability/seq-logs-declined-payment.png)
+
+The captured payment's full trace is in
+[`docs/assets/observability/grafana-tempo-trace-captured.png`](docs/assets/observability/grafana-tempo-trace-captured.png).
+How to use this when a payment fails: [**Runbook: tracing a failed card payment**](docs/RUNBOOK-failed-payment.md).
+
+```bash
+docker compose -f docker-compose.observability.yml up -d   # collector, Tempo, Prometheus, Grafana :3000, Seq :5341
+# then start both hosts with
+#   Otel__Endpoint=http://localhost:4317  Seq__Url=http://localhost:5341
+```
+
+All observability containers bind to 127.0.0.1 and run without authentication (Grafana anonymous
+admin): local demo only.
 ## API Design
 
 JSON API, JWT bearer auth, OpenAPI document at `/swagger`. Errors use RFC 7807
@@ -477,6 +530,7 @@ Design decisions:
 | Realtime | SignalR (refresh hints only, never balances) |
 | Docs | Swashbuckle / OpenAPI |
 | Mobile | Flutter (Dart 3), `http`, `flutter_secure_storage`, `signalr_netcore` |
+| Observability | Serilog (Seq sink), OpenTelemetry traces + metrics (OTLP -> collector -> Tempo, Prometheus, Seq), Grafana |
 | Tests | xUnit, FluentAssertions, `WebApplicationFactory`, Flutter widget tests |
 | CI | GitHub Actions with a SQL Server service container |
 
@@ -486,8 +540,8 @@ Design decisions:
 
 | Suite | Command | Infrastructure | Result |
 |-------|---------|----------------|--------|
-| .NET, full (2026-11-09) | `dotnet test` on `tests/ClearPay.Tests` and `tests/ClearPay.Operations.Tests` with `CLEARPAY_TEST_SQLSERVER` and `CLEARPAY_TEST_RABBITMQ` set | SQLite files (created by the tests) + SQL Server 2022 + RabbitMQ 3.13 in Docker | **279 passed, 0 failed, 0 skipped** (269 + 10) |
-| .NET, fast (2026-11-09) | same commands, variables unset | SQLite only | 261 passed, 0 failed, 18 skipped (ledger 253 + 16 skipped; Operations 8 + 2 skipped) |
+| .NET, full (2026-11-09) | `dotnet test` on `tests/ClearPay.Tests` and `tests/ClearPay.Operations.Tests` with `CLEARPAY_TEST_SQLSERVER` and `CLEARPAY_TEST_RABBITMQ` set | SQLite files (created by the tests) + SQL Server 2022 + RabbitMQ 3.13 in Docker | **281 passed, 0 failed, 0 skipped** (271 + 10) |
+| .NET, fast (2026-11-09) | same commands, variables unset | SQLite only | 263 passed, 0 failed, 18 skipped (ledger 255 + 16 skipped; Operations 8 + 2 skipped) |
 | Flutter (2026-11-03) | `flutter analyze` and `flutter test` in `mobile/clearpay` | none (mocked HTTP) | no analyzer issues; **20 passed, 0 failed** |
 | NuGet vulnerabilities | `dotnet list <project> package --vulnerable --include-transitive` | none | no vulnerable packages |
 
@@ -516,6 +570,7 @@ What the money tests cover:
 | Operations service: notifications once per event, operator report, out-of-order projection, poison events, admin-only API with the ledger's JWT | `NotificationAndProjectionTests`, `OperationsApiTests` (Operations.Tests), `PspSimulatorAdminApiTests` |
 | Two hosts over a real broker: ledger outbox -> RabbitMQ -> Operations projection + notification; full re-publish notifies once | `CrossServiceRabbitTests` (Operations.Tests, RabbitMQ) |
 | Operations migration and `ops.usp_SettlementCandidates` on SQL Server; architecture: Operations never references the ledger | `OperationsSqlServerTests` (SQL Server), `ArchitectureTests` |
+| Tracing: the outbox row keeps the request's traceparent and the outbox publish continues that trace; AMQP headers round-trip the context | `TracingTests` |
 | Inbox: same message twice posts once; a failing handler rolls back its inbox row; poison payloads | `InboxProcessorTests` |
 | RabbitMQ: outbox re-publish and broker redelivery after a crash before ack post once; retries wait 200 / 400 ms then succeed once; exhausted retries and poison messages land in the DLQ | `RabbitMessagingTests` (RabbitMQ) |
 | Outbox: failed publish stays Pending until the attempt limit, batch stops, message id = row id | `OutboxProcessorTests`, `RabbitOutboxPublisherTests` |

@@ -37,7 +37,8 @@ public sealed class ArchitectureTests
     public void Web_references_application_and_infrastructure_not_domain_directly()
     {
         var refs = ProjectRefs("src", "ClearPay.Web", "ClearPay.Web.csproj");
-        refs.Should().HaveCount(2);
+        refs.Should().HaveCount(3);
+        refs.Should().Contain(r => r.Contains("ClearPay.ServiceDefaults", StringComparison.Ordinal));
         refs.Should().Contain(r => r.Contains("ClearPay.Application", StringComparison.Ordinal));
         refs.Should().Contain(r => r.Contains("ClearPay.Infrastructure", StringComparison.Ordinal));
         refs.Should().NotContain(r => r.Contains("ClearPay.Domain", StringComparison.Ordinal));
@@ -90,7 +91,8 @@ public sealed class ArchitectureTests
     public void Operations_service_never_touches_the_ledger_host_or_its_database()
     {
         var refs = ProjectRefs("src", "ClearPay.Operations", "ClearPay.Operations.csproj");
-        refs.Should().HaveCount(2);
+        refs.Should().HaveCount(3);
+        refs.Should().Contain(r => r.Contains("ClearPay.ServiceDefaults", StringComparison.Ordinal));
         refs.Should().Contain(r => r.Contains("ClearPay.Application", StringComparison.Ordinal));
         refs.Should().Contain(r => r.Contains("ClearPay.Messaging", StringComparison.Ordinal));
         refs.Should().NotContain(r => r.Contains("Infrastructure", StringComparison.Ordinal) || r.Contains("ClearPay.Web", StringComparison.Ordinal));

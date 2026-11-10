@@ -10,6 +10,7 @@ using ClearPay.Application.Transfers;
 using ClearPay.Domain.Ledger;
 using ClearPay.Domain.Payments;
 using ClearPay.Infrastructure.Persistence;
+using ClearPay.Infrastructure.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -178,9 +179,12 @@ public sealed class SqlCardPaymentService : ICardPaymentService
             return PaymentResult.Fail(PaymentResultKind.Replay, await ViewAsync(payment.Id, cancellationToken).ConfigureAwait(false));
 
         var psp = _router.Resolve(payment.Provider)!;
+        using var pspSpan = ClearPayTelemetry.StartPspCall(psp.Name, "void", payment.Id, payment.Amount);
         var answer = await psp.VoidAsync(
             new PspFollowUpRequest(op.ProviderIdempotencyKey, payment.ProviderReference!, payment.Amount, op.CorrelationId),
             cancellationToken).ConfigureAwait(false);
+        ClearPayTelemetry.Complete(pspSpan, psp.Name, "void", answer);
+        pspSpan?.Stop(); // the span covers the PSP call only, not the SQL that records it
 
         return await RecordAsync(payment.Id, op.Id, answer, async (p, now2) =>
         {
@@ -259,9 +263,12 @@ public sealed class SqlCardPaymentService : ICardPaymentService
         await _cache.InvalidateAsync(payment.UserId, cancellationToken).ConfigureAwait(false);
 
         var psp = _router.Resolve(payment.Provider)!;
+        using var pspSpan = ClearPayTelemetry.StartPspCall(psp.Name, "refund", payment.Id, amount);
         var answer = await psp.RefundAsync(
             new PspFollowUpRequest(op.ProviderIdempotencyKey, payment.ProviderReference!, amount, op.CorrelationId),
             cancellationToken).ConfigureAwait(false);
+        ClearPayTelemetry.Complete(pspSpan, psp.Name, "refund", answer);
+        pspSpan?.Stop(); // the span covers the PSP call only, not the SQL that records it
 
         if (answer.Outcome == PspOutcome.Declined)
         {
@@ -291,10 +298,13 @@ public sealed class SqlCardPaymentService : ICardPaymentService
             .ConfigureAwait(false);
 
         var psp = _router.Resolve(payment.Provider)!;
+        using var pspSpan = ClearPayTelemetry.StartPspCall(psp.Name, "authorize", payment.Id, payment.Amount);
         var answer = await psp.AuthorizeAsync(
             new PspAuthorizeRequest(op.ProviderIdempotencyKey, payment.Amount, "TRY", payment.CardLast4,
                 session.Eci ?? "05", session.AuthenticationValue ?? string.Empty, payment.CorrelationId),
             cancellationToken).ConfigureAwait(false);
+        ClearPayTelemetry.Complete(pspSpan, psp.Name, "authorize", answer);
+        pspSpan?.Stop(); // the span covers the PSP call only, not the SQL that records it
 
         var result = await RecordAsync(paymentId, op.Id, answer, async (p, now) =>
         {
@@ -337,9 +347,12 @@ public sealed class SqlCardPaymentService : ICardPaymentService
         }
 
         var psp = _router.Resolve(payment.Provider)!;
+        using var pspSpan = ClearPayTelemetry.StartPspCall(psp.Name, "capture", payment.Id, payment.Amount);
         var answer = await psp.CaptureAsync(
             new PspFollowUpRequest(providerKey, payment.ProviderReference!, payment.Amount, payment.CorrelationId),
             cancellationToken).ConfigureAwait(false);
+        ClearPayTelemetry.Complete(pspSpan, psp.Name, "capture", answer);
+        pspSpan?.Stop(); // the span covers the PSP call only, not the SQL that records it
 
         var result = await RecordAsync(paymentId, op.Id, answer, async (p, now) =>
         {

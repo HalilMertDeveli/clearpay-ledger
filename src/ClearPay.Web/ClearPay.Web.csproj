@@ -12,6 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ClearPay.Application\ClearPay.Application.csproj" />
     <ProjectReference Include="..\ClearPay.Infrastructure\ClearPay.Infrastructure.csproj" />
+    <ProjectReference Include="..\ClearPay.ServiceDefaults\ClearPay.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

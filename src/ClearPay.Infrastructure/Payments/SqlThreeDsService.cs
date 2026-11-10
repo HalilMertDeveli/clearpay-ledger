@@ -249,6 +249,7 @@ public sealed class SqlThreeDsService : IThreeDsService
         AddEvent(after, now);
         await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await tx.CommitAsync(cancellationToken).ConfigureAwait(false);
+        Telemetry.ClearPayTelemetry.ThreeDsFinal(target.ToString());
         _db.ChangeTracker.Clear();
         _logger.LogInformation(
             "3DS session {SessionId} moved {From} -> {To} (correlation {CorrelationId})",
